@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<title>New Order</title>
+<style>
+  :root { --accent:#0a84ff; --bg:#f6f7f9; --card:#fff; --border:#e3e5ea; --text:#1a1a1a; --muted:#777; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; padding:0; background:var(--bg); color:var(--text);
+              font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif; font-size:16px; }
+  .wrap { max-width:560px; margin:0 auto; padding:16px; }
+  h1 { font-size:22px; margin:4px 0 18px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px;
+          padding:14px; margin-bottom:12px; }
+  label { display:block; font-size:13px; color:var(--muted); margin-bottom:4px; }
+  input, select, button, textarea {
+    width:100%; padding:12px 12px; font-size:16px; border:1px solid var(--border);
+    border-radius:8px; background:#fff; color:var(--text); outline:none;
+  }
+  input:focus, select:focus { border-color:var(--accent); }
+  .row { display:flex; gap:8px; }
+  .row > div { flex:1; }
+  .item-row { display:grid; grid-template-columns: 1fr 64px 70px 80px 60px 34px; gap:6px; margin-bottom:8px; }
+  .item-row input { padding:10px 8px; font-size:14px; }
+  .del { background:#eee; border:1px solid var(--border); color:#c23b3b; font-weight:bold; }
+  .add-item { background:#eef5ff; border:1px dashed var(--accent); color:var(--accent);
+              font-weight:600; margin-bottom:12px; padding:10px; }
+  .submit { background:var(--accent); color:#fff; border:none; font-weight:600; padding:14px;
+            font-size:17px; }
+  .submit:disabled { background:#9cc5ff; }
+  .toast { position:fixed; left:50%; bottom:30px; transform:translateX(-50%);
+           background:#222; color:#fff; padding:12px 18px; border-radius:24px; font-size:14px;
+           opacity:0; transition:opacity .25s; pointer-events:none; }
+  .toast.show { opacity:1; }
+  .muted { color:var(--muted); font-size:13px; margin-top:4px; }
+  .sw-vyapar { background:#0a84ff; }
+  .sw-tally  { background:#34a853; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>New Order</h1>
+
+  <div class="card">
+    <label>Party Name</label>
+    <input id="party" placeholder="e.g. Aaiji Sales" autocomplete="off" />
+    <div class="row" style="margin-top:10px;">
+      <div>
+        <label>Software</label>
+        <select id="software">
+          <option value="vyapar">Vyapar</option>
+          <option value="tally">Tally</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label style="font-size:14px; color:var(--text); font-weight:600;">Items</label>
+    <div id="items"></div>
+    <button type="button" class="add-item" onclick="addItem()">+ Add Item</button>
+  </div>
+
+  <button id="submit" class="submit" onclick="submitOrder()">Submit Order</button>
+  <div class="muted" id="status"></div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ─── CONFIGURE THESE TWO LINES ─────────────────────────────
+//  Replace with values from your Supabase project's API settings.
+//  Use the **anon public** key (safe for client-side; RLS policies
+//  restrict what it can do — see supabase_client.py for the SQL).
+const SUPABASE_URL = "https://hcvsxohxjargzoffhgkl.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjdnN4b2h4amFyZ3pvZmZoZ2tsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMjEwMjcsImV4cCI6MjA5MTU5NzAyN30.0I9d6G4tTCmzFWXTcWBMGlZrp7uMODWJhslif2GeZAc";
+// ───────────────────────────────────────────────────────────
+const TABLE = "pending_orders";
+
+function addItem(prefill) {
+  const row = document.createElement("div");
+  row.className = "item-row";
+  row.innerHTML = `
+    <input class="i-name" placeholder="Item name" />
+    <input class="i-qty"  placeholder="qty"  inputmode="decimal" />
+    <input class="i-unit" placeholder="unit" />
+    <input class="i-rate" placeholder="rate" inputmode="decimal" />
+    <input class="i-disc" placeholder="disc" inputmode="decimal" />
+    <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>
+  `;
+  document.getElementById("items").appendChild(row);
+}
+addItem();
+
+function toast(msg, ok=true) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.background = ok ? "#1e8e3e" : "#c23b3b";
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+function collect() {
+  const party = document.getElementById("party").value.trim();
+  if (!party) throw new Error("Enter party name");
+  const software = document.getElementById("software").value;
+  const rows = document.querySelectorAll("#items .item-row");
+  const items = [];
+  rows.forEach(r => {
+    const name = r.querySelector(".i-name").value.trim();
+    if (!name) return;
+    items.push({
+      name,
+      qty:  r.querySelector(".i-qty").value.trim() || "1",
+      unit: r.querySelector(".i-unit").value.trim(),
+      rate: r.querySelector(".i-rate").value.trim(),
+      disc: r.querySelector(".i-disc").value.trim() || "0",
+    });
+  });
+  if (items.length === 0) throw new Error("Add at least one item");
+  return { party_name: party, software, items, source: "mobile" };
+}
+
+async function submitOrder() {
+  const btn = document.getElementById("submit");
+  const status = document.getElementById("status");
+  let body;
+  try {
+    body = collect();
+  } catch (e) {
+    toast(e.message, false);
+    return;
+  }
+  btn.disabled = true;
+  status.textContent = "Submitting…";
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+      method: "POST",
+      headers: {
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`HTTP ${res.status}: ${t}`);
+    }
+    toast("Order sent ✓");
+    status.textContent = "";
+    // Reset form
+    document.getElementById("party").value = "";
+    document.getElementById("items").innerHTML = "";
+    addItem();
+  } catch (e) {
+    toast("Failed: " + e.message, false);
+    status.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
