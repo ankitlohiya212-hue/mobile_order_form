@@ -2,50 +2,164 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
 <title>New Order</title>
 <style>
-  :root { --accent:#0a84ff; --bg:#f6f7f9; --card:#fff; --border:#e3e5ea; --text:#1a1a1a; --muted:#777; }
-  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body { margin:0; padding:0; background:var(--bg); color:var(--text);
-              font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif; font-size:16px; }
-  .wrap { max-width:560px; margin:0 auto; padding:16px; }
-  h1 { font-size:22px; margin:4px 0 18px; }
-  .card { background:var(--card); border:1px solid var(--border); border-radius:12px;
-          padding:14px; margin-bottom:12px; }
-  label { display:block; font-size:13px; color:var(--muted); margin-bottom:4px; }
-  input, select, button, textarea {
-    width:100%; padding:12px 12px; font-size:16px; border:1px solid var(--border);
-    border-radius:8px; background:#fff; color:var(--text); outline:none;
+  :root {
+    --accent:#0a84ff;
+    --accent-soft:#eaf2ff;
+    --bg:#f5f6f8;
+    --card:#ffffff;
+    --border:#e4e6eb;
+    --border-strong:#d0d3d9;
+    --text:#141414;
+    --muted:#6b7280;
+    --danger:#c2373b;
+    --success:#1e8e3e;
+    --radius:12px;
   }
-  input:focus, select:focus { border-color:var(--accent); }
-  .row { display:flex; gap:8px; }
-  .row > div { flex:1; }
-  .item-row { display:grid; grid-template-columns: 1fr 64px 70px 80px 60px 34px; gap:6px; margin-bottom:8px; }
-  .item-row input { padding:10px 8px; font-size:14px; }
-  .del { background:#eee; border:1px solid var(--border); color:#c23b3b; font-weight:bold; }
-  .add-item { background:#eef5ff; border:1px dashed var(--accent); color:var(--accent);
-              font-weight:600; margin-bottom:12px; padding:10px; }
-  .submit { background:var(--accent); color:#fff; border:none; font-weight:600; padding:14px;
-            font-size:17px; }
-  .submit:disabled { background:#9cc5ff; }
-  .toast { position:fixed; left:50%; bottom:30px; transform:translateX(-50%);
-           background:#222; color:#fff; padding:12px 18px; border-radius:24px; font-size:14px;
-           opacity:0; transition:opacity .25s; pointer-events:none; }
-  .toast.show { opacity:1; }
-  .muted { color:var(--muted); font-size:13px; margin-top:4px; }
-  .sw-vyapar { background:#0a84ff; }
-  .sw-tally  { background:#34a853; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body {
+    margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,sans-serif;
+    font-size:16px; line-height:1.4;
+  }
+  .wrap { max-width:640px; margin:0 auto; padding:20px 16px 120px; }
+  h1 { font-size:24px; font-weight:600; letter-spacing:-0.01em; margin:0 0 18px; }
 
-  /* Autocomplete suggestion box */
+  .card {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .card-title {
+    font-size:13px; font-weight:600; color:var(--muted);
+    text-transform:uppercase; letter-spacing:0.04em;
+    margin:0 0 12px;
+  }
+
+  label {
+    display:block; font-size:12px; color:var(--muted);
+    margin-bottom:6px; font-weight:500;
+  }
+
+  input, select, button, textarea {
+    width:100%; padding:12px 14px; font-size:16px;
+    border:1px solid var(--border);
+    border-radius:10px; background:#fff; color:var(--text);
+    outline:none;
+    transition:border-color .15s, box-shadow .15s;
+    font-family:inherit;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(10,132,255,0.15);
+  }
+
+  select {
+    appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%236b7280' d='M6 8L0 0h12z'/></svg>");
+    background-repeat:no-repeat; background-position:right 14px center; padding-right:36px;
+  }
+
+  .item {
+    position:relative;
+    background:#fafbfc;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px;
+    margin-bottom:10px;
+  }
+  .item-name-row { margin-bottom:10px; padding-right:32px; }
+  .item-fields { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+  .item-fields input { padding:10px 8px; font-size:15px; text-align:center; }
+  .item-fields .cell label { text-align:center; font-size:11px; }
+
+  .del-btn {
+    position:absolute; top:10px; right:10px;
+    width:26px; height:26px; padding:0;
+    border-radius:50%; background:#fff; border:1px solid var(--border);
+    color:var(--danger); font-size:16px; font-weight:bold; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .del-btn:hover { background:#fff0f0; border-color:#f5c2c4; }
+
+  .add-item {
+    background:var(--accent-soft); border:1px dashed var(--accent);
+    color:var(--accent); font-weight:600; padding:12px;
+    cursor:pointer; font-size:15px;
+  }
+  .add-item:hover { background:#d9e7ff; }
+
+  .submit-bar {
+    position:sticky; bottom:0; margin:0 -16px -20px;
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, rgba(245,246,248,1) 70%, rgba(245,246,248,0));
+  }
+  .submit {
+    background:var(--accent); color:#fff; border:none;
+    font-weight:600; padding:15px; font-size:16px;
+    border-radius:10px; cursor:pointer;
+    box-shadow:0 2px 8px rgba(10,132,255,0.25);
+  }
+  .submit:disabled { background:#9cc5ff; box-shadow:none; cursor:not-allowed; }
+  .submit:active:not(:disabled) { transform:scale(0.99); }
+
+  .hint { color:var(--muted); font-size:12px; margin-top:8px; text-align:center; }
+  kbd {
+    background:#fff; border:1px solid var(--border-strong);
+    border-bottom-width:2px; border-radius:4px;
+    padding:1px 5px; font-size:11px; font-family:inherit; color:var(--text);
+  }
+
+  .toast {
+    position:fixed; left:50%; bottom:90px; transform:translateX(-50%);
+    background:#1f2024; color:#fff; padding:12px 20px; border-radius:24px;
+    font-size:14px; font-weight:500; opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s;
+    box-shadow:0 6px 20px rgba(0,0,0,0.25);
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(-4px); }
+
   .ac-box {
     position:absolute; background:#fff; border:1px solid var(--border);
-    border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.12);
-    max-height:240px; overflow-y:auto; z-index:1000; display:none;
+    border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.12);
+    max-height:260px; overflow-y:auto; z-index:1000; display:none;
   }
-  .ac-item { padding:10px 12px; font-size:15px; border-bottom:1px solid #f2f3f5; }
+  .ac-item { padding:11px 14px; font-size:15px; border-bottom:1px solid #f2f3f5; cursor:pointer; }
   .ac-item:last-child { border-bottom:none; }
-  .ac-item.active, .ac-item:active { background:#eef5ff; }
+  .ac-item.active, .ac-item:active { background:var(--accent-soft); color:var(--accent); }
+
+  .row-2 { display:grid; grid-template-columns:1fr 140px; gap:10px; }
+
+  /* Column headers above the item list (desktop only) */
+  .item-head { display:none; }
+
+  /* Desktop: single-row items */
+  @media (min-width: 640px) {
+    .item-head {
+      display:grid;
+      grid-template-columns: 1fr 72px 80px 90px 70px 34px;
+      gap:8px; padding:0 10px 6px;
+      font-size:11px; font-weight:600; color:var(--muted);
+      text-transform:uppercase; letter-spacing:0.04em;
+    }
+    .item-head span { text-align:center; }
+    .item-head span:first-child { text-align:left; }
+    .item {
+      display:grid;
+      grid-template-columns: 1fr 72px 80px 90px 70px 34px;
+      gap:8px; align-items:center; padding:10px;
+    }
+    .item-name-row { margin-bottom:0; padding-right:0; }
+    .item-name-row label { display:none; }
+    .item-fields { display:contents; }
+    .item-fields .cell label { display:none; }
+    .del-btn { position:static; }
+  }
 </style>
 </head>
 <body>
@@ -53,9 +167,11 @@
   <h1>New Order</h1>
 
   <div class="card">
-    <label>Party Name</label>
-    <input id="party" placeholder="e.g. Aaiji Sales" autocomplete="off" />
-    <div class="row" style="margin-top:10px;">
+    <div class="row-2">
+      <div>
+        <label>Party Name</label>
+        <input id="party" placeholder="e.g. Aaiji Sales" autocomplete="off" />
+      </div>
       <div>
         <label>Software</label>
         <select id="software">
@@ -67,13 +183,20 @@
   </div>
 
   <div class="card">
-    <label style="font-size:14px; color:var(--text); font-weight:600;">Items</label>
+    <div class="card-title">Items</div>
+    <div class="item-head" aria-hidden="true">
+      <span>Item</span><span>Qty</span><span>Unit</span><span>Rate</span><span>Disc</span><span></span>
+    </div>
     <div id="items"></div>
-    <button type="button" class="add-item" onclick="addItem()">+ Add Item</button>
+    <button type="button" class="add-item" onclick="addItem(true)">+ Add Item</button>
   </div>
 
-  <button id="submit" class="submit" onclick="submitOrder()">Submit Order</button>
-  <div class="muted" id="status"></div>
+  <div class="submit-bar">
+    <button id="submit" class="submit" onclick="submitOrder()">Submit Order</button>
+    <div class="hint">
+      <kbd>Enter</kbd> next field · <kbd>Ctrl</kbd>+<kbd>S</kbd> save
+    </div>
+  </div>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -85,30 +208,22 @@ window.CATALOG = {"vyapar": {"parties": ["Aaiji Sales", "Rahul Agencies"], "item
 </script>
 
 <script>
-// ─── CONFIGURE THESE TWO LINES ─────────────────────────────
 const SUPABASE_URL = "https://hcvsxohxjargzoffhgkl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjdnN4b2h4amFyZ3pvZmZoZ2tsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMjEwMjcsImV4cCI6MjA5MTU5NzAyN30.0I9d6G4tTCmzFWXTcWBMGlZrp7uMODWJhslif2GeZAc";
-// ───────────────────────────────────────────────────────────
 const TABLE = "pending_orders";
 
-function currentSoftware() {
-  return document.getElementById("software").value;
-}
-
+function currentSoftware() { return document.getElementById("software").value; }
 function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({
-    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
-  }[c]));
+  return s.replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 }
 
-// Lightweight autocomplete: substring match, word-prefix boosted to the top.
+// ─── Autocomplete ──────────────────────────────────────────
 function filterCatalog(list, query, limit = 10) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const starts = [], contains = [];
   for (const s of list) {
     const sl = s.toLowerCase();
-    // word-prefix match: query is start of any word in candidate
     const words = sl.split(/[\s:()\-\/]+/);
     if (words.some(w => w.startsWith(q))) starts.push(s);
     else if (sl.includes(q)) contains.push(s);
@@ -117,13 +232,12 @@ function filterCatalog(list, query, limit = 10) {
   return starts.concat(contains).slice(0, limit);
 }
 
-function attachAutocomplete(input, kind /* "parties" | "items" */) {
+function attachAutocomplete(input, kind) {
   const box = document.createElement("div");
   box.className = "ac-box";
   document.body.appendChild(box);
 
-  let shown = [];
-  let active = -1;
+  let shown = [], active = -1;
 
   function position() {
     const r = input.getBoundingClientRect();
@@ -131,7 +245,6 @@ function attachAutocomplete(input, kind /* "parties" | "items" */) {
     box.style.top  = (r.bottom + window.scrollY + 2) + "px";
     box.style.width = r.width + "px";
   }
-
   function render() {
     const list = (window.CATALOG[currentSoftware()] || {})[kind] || [];
     shown = filterCatalog(list, input.value);
@@ -143,10 +256,16 @@ function attachAutocomplete(input, kind /* "parties" | "items" */) {
     position();
     box.style.display = "block";
   }
-
   function hide() { box.style.display = "none"; shown = []; active = -1; }
+  input._acHide = hide;
+  input._acIsOpen = () => box.style.display === "block";
+  input._acTakeActive = () => {
+    if (active >= 0 && active < shown.length) {
+      input.value = shown[active]; hide(); return true;
+    }
+    return false;
+  };
 
-  // mousedown fires before blur — that's how we keep the value on tap
   box.addEventListener("mousedown", (e) => {
     const el = e.target.closest(".ac-item");
     if (!el) return;
@@ -155,7 +274,6 @@ function attachAutocomplete(input, kind /* "parties" | "items" */) {
     hide();
     input.focus();
   });
-
   input.addEventListener("input", render);
   input.addEventListener("focus", render);
   input.addEventListener("blur", () => setTimeout(hide, 150));
@@ -165,10 +283,6 @@ function attachAutocomplete(input, kind /* "parties" | "items" */) {
       e.preventDefault();
       active = (active + (e.key === "ArrowDown" ? 1 : -1) + shown.length) % shown.length;
       [...box.children].forEach((c, i) => c.classList.toggle("active", i === active));
-    } else if (e.key === "Enter" && active >= 0) {
-      e.preventDefault();
-      input.value = shown[active];
-      hide();
     } else if (e.key === "Escape") {
       hide();
     }
@@ -177,28 +291,86 @@ function attachAutocomplete(input, kind /* "parties" | "items" */) {
   window.addEventListener("resize", () => { if (box.style.display === "block") position(); });
 }
 
-function addItem() {
+// ─── Keyboard navigation ──────────────────────────────────
+function nextInputFrom(el) {
+  if (el.id === "party") {
+    return document.querySelector("#items .item .i-name");
+  }
+  const row = el.closest(".item");
+  if (!row) return null;
+  const order = [".i-name", ".i-qty", ".i-unit", ".i-rate", ".i-disc"];
+  const cls = order.find(c => el.classList.contains(c.slice(1)));
+  const idx = order.indexOf(cls);
+  if (idx >= 0 && idx < order.length - 1) {
+    return row.querySelector(order[idx + 1]);
+  }
+  const allRows = [...document.querySelectorAll("#items .item")];
+  const rowIdx = allRows.indexOf(row);
+  if (rowIdx >= 0 && rowIdx < allRows.length - 1) {
+    return allRows[rowIdx + 1].querySelector(".i-name");
+  }
+  addItem(true);
+  return document.querySelector("#items .item:last-child .i-name");
+}
+
+function onEnterAdvance(e) {
+  if (e.key !== "Enter") return;
+  const el = e.target;
+  if (el._acIsOpen && el._acIsOpen() && el._acTakeActive && el._acTakeActive()) {
+    e.preventDefault();
+    return;
+  }
+  if (el._acHide) el._acHide();
+  const nxt = nextInputFrom(el);
+  if (nxt) {
+    e.preventDefault();
+    nxt.focus();
+    nxt.select && nxt.select();
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    submitOrder();
+  }
+});
+
+// ─── Item rows ────────────────────────────────────────────
+function addItem(focusIt) {
   const row = document.createElement("div");
-  row.className = "item-row";
+  row.className = "item";
   row.innerHTML = `
-    <input class="i-name" placeholder="Item name" autocomplete="off" />
-    <input class="i-qty"  placeholder="qty"  inputmode="decimal" />
-    <input class="i-unit" placeholder="unit" />
-    <input class="i-rate" placeholder="rate" inputmode="decimal" />
-    <input class="i-disc" placeholder="disc" inputmode="decimal" />
-    <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>
+    <div class="item-name-row cell">
+      <label>Item</label>
+      <input class="i-name" placeholder="Item name" autocomplete="off" />
+    </div>
+    <div class="item-fields">
+      <div class="cell"><label>Qty</label>  <input class="i-qty"  placeholder="1" inputmode="decimal" /></div>
+      <div class="cell"><label>Unit</label> <input class="i-unit" placeholder="pcs" /></div>
+      <div class="cell"><label>Rate</label> <input class="i-rate" placeholder="0" inputmode="decimal" /></div>
+      <div class="cell"><label>Disc</label> <input class="i-disc" placeholder="0" inputmode="decimal" /></div>
+    </div>
+    <button type="button" class="del-btn" title="Remove" onclick="this.closest('.item').remove()">×</button>
   `;
   document.getElementById("items").appendChild(row);
   attachAutocomplete(row.querySelector(".i-name"), "items");
+  row.querySelectorAll("input").forEach(i => i.addEventListener("keydown", onEnterAdvance));
+  if (focusIt) row.querySelector(".i-name").focus();
 }
 
-attachAutocomplete(document.getElementById("party"), "parties");
-addItem();
+(function init() {
+  const party = document.getElementById("party");
+  attachAutocomplete(party, "parties");
+  party.addEventListener("keydown", onEnterAdvance);
+  addItem(false);
+})();
 
+// ─── Toast + submit ───────────────────────────────────────
 function toast(msg, ok=true) {
   const t = document.getElementById("toast");
   t.textContent = msg;
-  t.style.background = ok ? "#1e8e3e" : "#c23b3b";
+  t.style.background = ok ? "#1e8e3e" : "#c2373b";
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 2200);
 }
@@ -207,7 +379,7 @@ function collect() {
   const party = document.getElementById("party").value.trim();
   if (!party) throw new Error("Enter party name");
   const software = currentSoftware();
-  const rows = document.querySelectorAll("#items .item-row");
+  const rows = document.querySelectorAll("#items .item");
   const items = [];
   rows.forEach(r => {
     const name = r.querySelector(".i-name").value.trim();
@@ -226,16 +398,11 @@ function collect() {
 
 async function submitOrder() {
   const btn = document.getElementById("submit");
-  const status = document.getElementById("status");
   let body;
-  try {
-    body = collect();
-  } catch (e) {
-    toast(e.message, false);
-    return;
-  }
+  try { body = collect(); }
+  catch (e) { toast(e.message, false); return; }
   btn.disabled = true;
-  status.textContent = "Submitting…";
+  btn.textContent = "Submitting…";
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
       method: "POST",
@@ -252,15 +419,14 @@ async function submitOrder() {
       throw new Error(`HTTP ${res.status}: ${t}`);
     }
     toast("Order sent ✓");
-    status.textContent = "";
     document.getElementById("party").value = "";
     document.getElementById("items").innerHTML = "";
-    addItem();
+    addItem(true);
   } catch (e) {
     toast("Failed: " + e.message, false);
-    status.textContent = e.message;
   } finally {
     btn.disabled = false;
+    btn.textContent = "Submit Order";
   }
 }
 </script>
