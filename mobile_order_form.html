@@ -218,15 +218,19 @@ function escapeHtml(s) {
 }
 
 // ─── Autocomplete ──────────────────────────────────────────
+// Normalize: lowercase + drop everything that isn't a letter/digit.
+// So "Ag Medium", "Ag-Medium", "ag  medium", "AG:MEDIUM" all match.
+function norm(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, ""); }
+
 function filterCatalog(list, query, limit = 10) {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
+  const qn = norm(query);
+  if (!qn) return [];
   const starts = [], contains = [];
   for (const s of list) {
-    const sl = s.toLowerCase();
-    const words = sl.split(/[\s:()\-\/]+/);
-    if (words.some(w => w.startsWith(q))) starts.push(s);
-    else if (sl.includes(q)) contains.push(s);
+    const sn = norm(s);
+    const words = s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    if (sn.startsWith(qn) || words.some(w => w.startsWith(qn))) starts.push(s);
+    else if (sn.includes(qn)) contains.push(s);
     if (starts.length >= limit) break;
   }
   return starts.concat(contains).slice(0, limit);
