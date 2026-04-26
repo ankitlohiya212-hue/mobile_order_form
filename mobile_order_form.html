@@ -232,11 +232,11 @@
   <div id="tab-new">
 
   <div class="card">
-    <div class="row-2">
-      <div>
-        <label>Party Name</label>
-        <input id="party" placeholder="e.g. Aaiji Sales" autocomplete="off" />
-      </div>
+    <div>
+      <label>Party Name</label>
+      <input id="party" placeholder="e.g. Aaiji Sales" autocomplete="off" />
+    </div>
+    <div class="row-2" style="margin-top:10px;">
       <div>
         <label>Software</label>
         <select id="software">
@@ -244,13 +244,13 @@
           <option value="tally">Tally</option>
         </select>
       </div>
-    </div>
-    <div style="margin-top:10px;">
-      <label>Order Type</label>
-      <select id="order_type">
-        <option value="local">Local</option>
-        <option value="market_yard">Market Yard</option>
-      </select>
+      <div>
+        <label>Order Type</label>
+        <select id="order_type">
+          <option value="local">Local</option>
+          <option value="market_yard">Market Yard</option>
+        </select>
+      </div>
     </div>
   </div>
 
@@ -261,6 +261,12 @@
     </div>
     <div id="items"></div>
     <button type="button" class="add-item" onclick="addItem(true)">+ Add Item</button>
+  </div>
+
+  <div class="card">
+    <label>Notes <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+    <textarea id="notes" rows="2" placeholder="e.g. urgent, call before delivery…"
+              style="resize:vertical;font-size:15px;padding:10px 12px;"></textarea>
   </div>
 
   <div class="submit-bar">
@@ -482,7 +488,8 @@ function collect() {
   });
   if (items.length === 0) throw new Error("Add at least one item");
   const order_type = document.getElementById("order_type").value;
-  return { party_name: party, software, order_type, items, source: "mobile" };
+  const notes = document.getElementById("notes").value.trim();
+  return { party_name: party, software, order_type, items, notes, source: "mobile" };
 }
 
 async function submitOrder() {
@@ -509,6 +516,7 @@ async function submitOrder() {
     }
     toast("Order sent ✓");
     document.getElementById("party").value = "";
+    document.getElementById("notes").value = "";
     document.getElementById("items").innerHTML = "";
     addItem(true);
   } catch (e) {
