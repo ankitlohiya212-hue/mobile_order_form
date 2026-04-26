@@ -135,6 +135,63 @@
 
   .row-2 { display:grid; grid-template-columns:1fr 140px; gap:10px; }
 
+  /* ── Top nav tabs ── */
+  .top-nav {
+    display:flex; gap:0; margin-bottom:18px;
+    background:#e9eaec; border-radius:10px; padding:3px;
+  }
+  .top-nav button {
+    flex:1; padding:10px 8px; border:none; background:transparent;
+    color:var(--muted); font-weight:600; font-size:14px;
+    border-radius:8px; cursor:pointer; transition:all .18s;
+  }
+  .top-nav button.active {
+    background:#fff; color:var(--text);
+    box-shadow:0 1px 4px rgba(0,0,0,0.12);
+  }
+
+  /* ── Pending list ── */
+  .pending-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:10px; padding:14px 16px; margin-bottom:10px;
+  }
+  .pending-party { font-size:16px; font-weight:700; margin:0 0 6px; }
+  .pending-items { font-size:14px; color:var(--muted); line-height:1.7; margin:0 0 6px; }
+  .pending-note { font-size:13px; color:var(--accent); margin:0; }
+  .pending-meta {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:8px; font-size:12px; color:var(--muted);
+  }
+  .badge {
+    display:inline-block; padding:2px 9px; border-radius:20px;
+    font-size:11px; font-weight:600; text-transform:uppercase;
+  }
+  .badge-vyapar { background:#dbeafe; color:#1d4ed8; }
+  .badge-tally  { background:#dcfce7; color:#15803d; }
+  .badge-local  { background:#f3f4f6; color:#374151; }
+  .badge-market { background:#fef9c3; color:#854d0e; }
+  .pending-empty { text-align:center; padding:60px 16px; color:var(--muted); font-size:15px; }
+  .pending-refresh {
+    text-align:right; margin-bottom:12px;
+  }
+  .pending-refresh button {
+    background:none; border:1px solid var(--border); color:var(--muted);
+    font-size:13px; padding:7px 14px; border-radius:8px; cursor:pointer; width:auto;
+  }
+  .type-tabs {
+    display:flex; gap:0; margin-bottom:14px;
+    background:#e9eaec; border-radius:8px; padding:3px;
+  }
+  .type-tabs button {
+    flex:1; padding:8px; border:none; background:transparent;
+    color:var(--muted); font-weight:600; font-size:13px;
+    border-radius:6px; cursor:pointer; transition:all .18s;
+  }
+  .type-tabs button.active {
+    background:#fff; color:var(--text);
+    box-shadow:0 1px 3px rgba(0,0,0,0.10);
+  }
+
   /* Column headers above the item list (desktop only) */
   .item-head { display:none; }
 
@@ -164,7 +221,15 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>New Order</h1>
+  <h1>Orders</h1>
+
+  <div class="top-nav">
+    <button class="active" onclick="switchTab('new')">New Order</button>
+    <button onclick="switchTab('pending')">Pending</button>
+  </div>
+
+  <!-- ── New Order section ── -->
+  <div id="tab-new">
 
   <div class="card">
     <div class="row-2">
@@ -204,6 +269,18 @@
       <kbd>Enter</kbd> next field · <kbd>Ctrl</kbd>+<kbd>S</kbd> save
     </div>
   </div>
+</div><!-- end tab-new -->
+
+<!-- ── Pending Orders section ── -->
+<div id="tab-pending" style="display:none;">
+  <div class="pending-refresh">
+    <button onclick="loadPending()">↺ Refresh</button>
+  </div>
+  <div class="type-tabs">
+    <button class="active" id="type-btn-local" onclick="filterType('local')">Local</button>
+    <button id="type-btn-market_yard" onclick="filterType('market_yard')">Market Yard</button>
+  </div>
+  <div id="pending-list"><div class="pending-empty">Loading…</div></div>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -440,6 +517,76 @@ async function submitOrder() {
     btn.disabled = false;
     btn.textContent = "Submit Order";
   }
+}
+
+// ── Tab navigation ──────────────────────────────────────
+let _pendingPollTimer = null;
+let _allPendingOrders = [];
+let _activeType = 'local';
+
+function switchTab(tab) {
+  document.getElementById('tab-new').style.display     = tab === 'new'     ? '' : 'none';
+  document.getElementById('tab-pending').style.display = tab === 'pending' ? '' : 'none';
+  document.querySelectorAll('.top-nav button').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && tab === 'new') || (i === 1 && tab === 'pending'));
+  });
+  if (tab === 'pending') {
+    loadPending();
+    if (!_pendingPollTimer)
+      _pendingPollTimer = setInterval(loadPending, 30000);
+  } else {
+    clearInterval(_pendingPollTimer);
+    _pendingPollTimer = null;
+  }
+}
+
+function filterType(type) {
+  _activeType = type;
+  document.querySelectorAll('.type-tabs button').forEach(b => b.classList.remove('active'));
+  document.getElementById('type-btn-' + type).classList.add('active');
+  renderPending();
+}
+
+async function loadPending() {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=created_at.asc`,
+      { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    _allPendingOrders = await res.json();
+    renderPending();
+  } catch (e) {
+    document.getElementById('pending-list').innerHTML =
+      `<div class="pending-empty">⚠ ${e.message}</div>`;
+  }
+}
+
+function renderPending() {
+  const list = _allPendingOrders.filter(o => (o.order_type || 'local') === _activeType);
+  const el = document.getElementById('pending-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="pending-empty">No pending orders here ✓</div>';
+    return;
+  }
+  el.innerHTML = list.map(o => {
+    const itemLines = (o.items || [])
+      .map(it => `${it.name} × ${it.qty}${it.unit ? ' ' + it.unit : ''}`)
+      .join('<br>');
+    const noteHtml = o.notes
+      ? `<p class="pending-note">📝 ${o.notes}</p>` : '';
+    const swBadge = `<span class="badge badge-${o.software}">${o.software.toUpperCase()}</span>`;
+    const typeBadge = o.order_type === 'market_yard'
+      ? `<span class="badge badge-market">Market Yard</span>`
+      : `<span class="badge badge-local">Local</span>`;
+    const ts = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    return `<div class="pending-card">
+      <p class="pending-party">${o.party_name}</p>
+      <p class="pending-items">${itemLines}</p>
+      ${noteHtml}
+      <div class="pending-meta">${swBadge} ${typeBadge} <span>${ts}</span></div>
+    </div>`;
+  }).join('');
 }
 </script>
 </body>
