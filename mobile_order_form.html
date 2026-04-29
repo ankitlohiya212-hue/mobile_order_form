@@ -301,6 +301,7 @@ window.CATALOG = {"vyapar": {"parties": ["A1 Stores Nehru Chowk", "Aaiji Sales M
 const SUPABASE_URL = "https://hcvsxohxjargzoffhgkl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjdnN4b2h4amFyZ3pvZmZoZ2tsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMjEwMjcsImV4cCI6MjA5MTU5NzAyN30.0I9d6G4tTCmzFWXTcWBMGlZrp7uMODWJhslif2GeZAc";
 const TABLE = "pending_orders";
+const LP_TABLE = "party_last_prices";
 
 function currentSoftware() { return document.getElementById("software").value; }
 function escapeHtml(s) {
@@ -326,7 +327,7 @@ function filterCatalog(list, query, limit = 10) {
   return starts.concat(contains).slice(0, limit);
 }
 
-function attachAutocomplete(input, kind) {
+function attachAutocomplete(input, kind, onSelect) {
   const box = document.createElement("div");
   box.className = "ac-box";
   document.body.appendChild(box);
@@ -367,6 +368,7 @@ function attachAutocomplete(input, kind) {
     input.value = shown[+el.dataset.i];
     hide();
     input.focus();
+    if (onSelect) onSelect(input.value);
   });
   input.addEventListener("input", render);
   input.addEventListener("focus", render);
@@ -377,6 +379,11 @@ function attachAutocomplete(input, kind) {
       e.preventDefault();
       active = (active + (e.key === "ArrowDown" ? 1 : -1) + shown.length) % shown.length;
       [...box.children].forEach((c, i) => c.classList.toggle("active", i === active));
+    } else if (e.key === "Enter" && active >= 0) {
+      e.preventDefault();
+      input.value = shown[active];
+      hide();
+      if (onSelect) onSelect(input.value);
     } else if (e.key === "Escape") {
       hide();
     }
@@ -431,6 +438,39 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ─── Item rows ────────────────────────────────────────────
+// ── Party last-price lookup ───────────────────────────────
+let _lastPrices = {};   // {item_name_lower: {rate, unit}}
+
+async function fetchLastPrices(partyName) {
+  _lastPrices = {};
+  if (!partyName) return;
+  try {
+    const sw = currentSoftware();
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${LP_TABLE}?party_name=eq.${encodeURIComponent(partyName)}&software=eq.${sw}&select=item_name,rate,unit`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) return;
+    const rows = await res.json();
+    rows.forEach(r => { _lastPrices[r.item_name.toLowerCase()] = { rate: r.rate, unit: r.unit }; });
+  } catch (_) {}
+}
+
+function applyLastPrice(nameInput, rateInput, unitInput) {
+  const key = nameInput.value.trim().toLowerCase();
+  if (!key) return;
+  let match = _lastPrices[key];
+  if (!match) {
+    const k8 = key.slice(0, 8);
+    for (const [k, v] of Object.entries(_lastPrices)) {
+      if (k.startsWith(k8) || k8.startsWith(k.slice(0, 8))) { match = v; break; }
+    }
+  }
+  if (!match) return;
+  if (!rateInput.value.trim()) rateInput.value = match.rate;
+  if (!unitInput.value.trim() && match.unit) unitInput.value = match.unit;
+}
+
 function addItem(focusIt) {
   const row = document.createElement("div");
   row.className = "item";
@@ -448,15 +488,27 @@ function addItem(focusIt) {
     <button type="button" class="del-btn" title="Remove" onclick="this.closest('.item').remove()">×</button>
   `;
   document.getElementById("items").appendChild(row);
-  attachAutocomplete(row.querySelector(".i-name"), "items");
+  const nameEl = row.querySelector(".i-name");
+  const rateEl = row.querySelector(".i-rate");
+  const unitEl = row.querySelector(".i-unit");
+  // on_select: fill immediately when item chosen from dropdown
+  attachAutocomplete(nameEl, "items", () => setTimeout(() => applyLastPrice(nameEl, rateEl, unitEl), 50));
   row.querySelectorAll("input").forEach(i => i.addEventListener("keydown", onEnterAdvance));
-  if (focusIt) row.querySelector(".i-name").focus();
+  // blur: secondary trigger if user types name manually
+  nameEl.addEventListener("blur", () => setTimeout(() => applyLastPrice(nameEl, rateEl, unitEl), 120));
+  if (focusIt) nameEl.focus();
 }
 
 (function init() {
   const party = document.getElementById("party");
-  attachAutocomplete(party, "parties");
+  // onSelect: fetch immediately when party chosen from dropdown
+  attachAutocomplete(party, "parties", (v) => fetchLastPrices(v));
   party.addEventListener("keydown", onEnterAdvance);
+  // blur: secondary trigger if user types party name manually
+  party.addEventListener("blur", () => {
+    const name = party.value.trim();
+    if (name) fetchLastPrices(name);
+  });
   addItem(false);
 })();
 
