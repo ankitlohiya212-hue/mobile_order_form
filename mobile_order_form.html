@@ -150,6 +150,15 @@
     box-shadow:0 1px 4px rgba(0,0,0,0.12);
   }
 
+  /* ── Desktop online/offline banner ── */
+  .desk-status {
+    padding:9px 12px; border-radius:8px; margin-bottom:14px;
+    font-size:13px; font-weight:600; text-align:center;
+  }
+  .desk-online  { background:#e6f7ec; color:var(--success); }
+  .desk-offline { background:#fdecec; color:var(--danger); }
+  .desk-unknown { background:#f3f4f6; color:var(--muted); }
+
   /* ── Pending list ── */
   .pending-card {
     background:var(--card); border:1px solid var(--border);
@@ -243,6 +252,8 @@
     <button class="active" onclick="switchTab('new')">New Order</button>
     <button onclick="switchTab('pending')">Pending</button>
   </div>
+
+  <div id="desktop-status" class="desk-status desk-unknown">Checking shop computer…</div>
 
   <!-- ── New Order section ── -->
   <div id="tab-new">
@@ -526,7 +537,35 @@ function addItem(focusIt) {
     if (name) fetchLastPrices(name);
   });
   addItem(false);
+  checkDesktopStatus();
+  setInterval(checkDesktopStatus, 25000);   // re-check every 25s
 })();
+
+// ─── Desktop online indicator (reads the worker's heartbeat) ──
+const HB_TABLE = "app_heartbeat";
+const HB_FRESH_MS = 90000;   // online if the desktop beat within the last 90s
+
+async function checkDesktopStatus() {
+  const el = document.getElementById('desktop-status');
+  if (!el) return;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${HB_TABLE}?name=eq.desktop&select=last_seen`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+    const rows = await res.json();
+    const lastSeen = rows.length ? rows[0].last_seen : null;
+    if (lastSeen && (Date.now() - new Date(lastSeen).getTime()) < HB_FRESH_MS) {
+      el.className = 'desk-status desk-online';
+      el.textContent = '🟢 Shop computer online — orders can be processed now';
+    } else {
+      el.className = 'desk-status desk-offline';
+      el.textContent = '🔴 Shop computer offline — orders will queue until it’s back';
+    }
+  } catch (e) {
+    el.className = 'desk-status desk-unknown';
+    el.textContent = '⚪ Couldn’t check shop computer status';
+  }
+}
 
 // ─── Toast + submit ───────────────────────────────────────
 function toast(msg, ok=true) {
