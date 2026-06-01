@@ -192,6 +192,22 @@
     box-shadow:0 1px 3px rgba(0,0,0,0.10);
   }
 
+  /* ── Remote "Process now" button + status ── */
+  .proc-btn {
+    margin-top:12px; background:var(--accent); color:#fff; border:none;
+    font-weight:600; padding:12px; font-size:15px; border-radius:8px; cursor:pointer;
+    box-shadow:0 2px 6px rgba(10,132,255,0.22);
+  }
+  .proc-btn:disabled { background:#9cc5ff; box-shadow:none; cursor:not-allowed; }
+  .proc-btn:active:not(:disabled) { transform:scale(0.99); }
+  .proc-status {
+    margin-top:12px; padding:11px 13px; border-radius:8px;
+    font-size:14px; font-weight:500; line-height:1.45;
+  }
+  .proc-wait { background:#fff7e6; color:#8a6d3b; }
+  .proc-ok   { background:#e6f7ec; color:var(--success); }
+  .proc-fail { background:#fdecec; color:var(--danger); }
+
   /* Column headers above the item list (desktop only) */
   .item-head { display:none; }
 
@@ -610,7 +626,7 @@ function filterType(type) {
 async function loadPending() {
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=created_at.asc`,
+      `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.pending&select=*&order=created_at.asc`,
       { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -640,13 +656,112 @@ function renderPending() {
       ? `<span class="badge badge-market">Market Yard</span>`
       : `<span class="badge badge-local">Local</span>`;
     const ts = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
-    return `<div class="pending-card">
-      <p class="pending-party">${o.party_name}</p>
+    return `<div class="pending-card" data-id="${o.id}">
+      <p class="pending-party">${escapeHtml(o.party_name)}</p>
       <p class="pending-items">${itemLines}</p>
       ${noteHtml}
       <div class="pending-meta">${swBadge} ${typeBadge} <span>${ts}</span></div>
+      <button class="proc-btn" onclick="processOrder('${o.id}', this)">⚡ Process now</button>
     </div>`;
   }).join('');
+}
+
+// ── Remote processing: ask the desktop app to bill this order ──
+const PROCESS_POLL_MS = 4000;
+const PROCESS_TIMEOUT_MS = 120000;   // 2 min before we give up waiting
+
+async function processOrder(id, btn) {
+  if (!confirm('Process this order now on the shop computer?')) return;
+  const card = btn.closest('.pending-card');
+
+  // Pause the list auto-refresh so it doesn't wipe this card mid-processing
+  clearInterval(_pendingPollTimer); _pendingPollTimer = null;
+  setCardStatus(card, 'wait', '⏳ Sent to desktop — waiting for it to process…');
+
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status: 'process_requested', result_message: '' }),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+  } catch (e) {
+    setCardStatus(card, 'fail', '✗ Could not reach the server: ' + escapeHtml(e.message));
+    resumePending();
+    return;
+  }
+
+  const started = Date.now();
+  const poll = async () => {
+    if (Date.now() - started > PROCESS_TIMEOUT_MS) {
+      setCardStatus(card, 'fail',
+        '⚠ No response from the desktop. Make sure the billing app is running on the shop PC, then try again.');
+      resumePending();
+      return;
+    }
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}&select=status,result_message`,
+        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+      const rows = await res.json();
+
+      if (!rows.length) {              // row gone → processed & cleaned up
+        setCardStatus(card, 'ok', '✓ Processed.');
+        setTimeout(resumePending, 2500);
+        return;
+      }
+      const row = rows[0];
+      if (row.status === 'done') {
+        setCardStatus(card, 'ok', '✓ ' + escapeHtml(row.result_message || 'Done.'));
+        deleteOrderRow(id);
+        setTimeout(resumePending, 3000);
+        return;
+      }
+      if (row.status === 'failed') {
+        setCardStatus(card, 'fail', '✗ ' + escapeHtml(row.result_message || 'Processing failed.'));
+        deleteOrderRow(id);
+        setTimeout(resumePending, 4000);
+        return;
+      }
+      // still process_requested or processing → keep waiting
+      setCardStatus(card, 'wait',
+        row.status === 'processing' ? '⚙ Processing on desktop…' : '⏳ Waiting for desktop…');
+      setTimeout(poll, PROCESS_POLL_MS);
+    } catch (e) {
+      setTimeout(poll, PROCESS_POLL_MS);   // transient network blip — retry
+    }
+  };
+  setTimeout(poll, PROCESS_POLL_MS);
+}
+
+function setCardStatus(card, kind, msg) {
+  if (!card) return;
+  const btn = card.querySelector('.proc-btn');
+  if (btn) btn.disabled = true;
+  let el = card.querySelector('.proc-status');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'proc-status';
+    card.appendChild(el);
+  }
+  el.className = 'proc-status proc-' + kind;
+  el.innerHTML = msg;
+}
+
+function deleteOrderRow(id) {
+  fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+  }).catch(() => {});
+}
+
+function resumePending() {
+  if (!_pendingPollTimer) _pendingPollTimer = setInterval(loadPending, 30000);
+  loadPending();
 }
 </script>
 </body>
