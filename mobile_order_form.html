@@ -77,6 +77,12 @@
   .item-fields input { padding:10px 8px; font-size:15px; text-align:center; }
   .item-fields .cell label { text-align:center; font-size:11px; }
 
+  /* Vyapar shows Free; Tally shows Discount. Exactly one is visible at a time,
+     so each item row always has 4 numeric fields and the item-name row stays roomy. */
+  .free-cell, .free-head { display:none; }       /* default (Tally): Free hidden */
+  body.show-free .free-cell { display:block; }   /* Vyapar: show Free… */
+  body.show-free .disc-cell { display:none; }    /* …and hide Discount */
+
   .del-btn {
     position:absolute; top:10px; right:10px;
     width:26px; height:26px; padding:0;
@@ -217,6 +223,22 @@
   .proc-ok   { background:#e6f7ec; color:var(--success); }
   .proc-fail { background:#fdecec; color:var(--danger); }
 
+  /* ── Pending card Edit / Delete buttons ── */
+  .card-actions { display:flex; gap:8px; margin-top:10px; }
+  .mini-btn {
+    flex:1; padding:9px; font-size:13px; font-weight:600; border-radius:8px;
+    border:1px solid var(--border); background:#fff; color:var(--text); cursor:pointer;
+  }
+  .mini-btn:active { transform:scale(0.99); }
+  .mini-danger { color:var(--danger); border-color:#f3c2c4; }
+
+  /* ── "Editing an order" banner on the New Order tab ── */
+  .edit-banner {
+    background:#fff7e6; color:#8a6d3b; padding:9px 12px; border-radius:8px;
+    margin-bottom:14px; font-size:13px; font-weight:600;
+  }
+  .edit-banner a { color:var(--accent); text-decoration:none; }
+
   /* Column headers above the item list (desktop only) */
   .item-head { display:none; }
 
@@ -224,7 +246,7 @@
   @media (min-width: 640px) {
     .item-head {
       display:grid;
-      grid-template-columns: 1fr 72px 80px 90px 70px 34px;
+      grid-template-columns: 1fr 58px 64px 76px 58px 30px;
       gap:8px; padding:0 10px 6px;
       font-size:11px; font-weight:600; color:var(--muted);
       text-transform:uppercase; letter-spacing:0.04em;
@@ -233,7 +255,7 @@
     .item-head span:first-child { text-align:left; }
     .item {
       display:grid;
-      grid-template-columns: 1fr 72px 80px 90px 70px 34px;
+      grid-template-columns: 1fr 58px 64px 76px 58px 30px;
       gap:8px; align-items:center; padding:10px;
     }
     .item-name-row { margin-bottom:0; padding-right:0; }
@@ -241,6 +263,10 @@
     .item-fields { display:contents; }
     .item-fields .cell label { display:none; }
     .del-btn { position:static; }
+
+    /* Vyapar swaps the Disc header for a Free header (same 6-column grid) */
+    body.show-free .free-head { display:block; }
+    body.show-free .disc-head { display:none; }
   }
 </style>
 </head>
@@ -257,6 +283,10 @@
 
   <!-- ── New Order section ── -->
   <div id="tab-new">
+
+  <div id="edit-banner" class="edit-banner" style="display:none;">
+    ✎ Editing an existing order · <a href="#" onclick="cancelEdit();return false;">Cancel</a>
+  </div>
 
   <div class="card">
     <div>
@@ -284,7 +314,7 @@
   <div class="card">
     <div class="card-title">Items</div>
     <div class="item-head" aria-hidden="true">
-      <span>Item</span><span>Qty</span><span>Unit</span><span>Rate</span><span>Disc</span><span></span>
+      <span>Item</span><span>Qty</span><span>Unit</span><span>Rate</span><span class="disc-head">Disc</span><span class="free-head">Free</span><span></span>
     </div>
     <div id="items"></div>
     <button type="button" class="add-item" onclick="addItem(true)">+ Add Item</button>
@@ -426,11 +456,13 @@ function nextInputFrom(el) {
   }
   const row = el.closest(".item");
   if (!row) return null;
-  const order = [".i-name", ".i-qty", ".i-unit", ".i-rate", ".i-disc"];
+  const order = [".i-name", ".i-qty", ".i-unit", ".i-rate", ".i-disc", ".i-free"];
   const cls = order.find(c => el.classList.contains(c.slice(1)));
   const idx = order.indexOf(cls);
-  if (idx >= 0 && idx < order.length - 1) {
-    return row.querySelector(order[idx + 1]);
+  // advance to the next *visible* field in this row (skips hidden Disc/Free)
+  for (let j = idx + 1; j < order.length; j++) {
+    const cand = row.querySelector(order[j]);
+    if (cand && cand.offsetParent !== null) return cand;
   }
   const allRows = [...document.querySelectorAll("#items .item")];
   const rowIdx = allRows.indexOf(row);
@@ -510,7 +542,8 @@ function addItem(focusIt) {
       <div class="cell"><label>Qty</label>  <input class="i-qty"  placeholder="1" inputmode="decimal" /></div>
       <div class="cell"><label>Unit</label> <input class="i-unit" placeholder="pcs" /></div>
       <div class="cell"><label>Rate</label> <input class="i-rate" placeholder="0" inputmode="decimal" /></div>
-      <div class="cell"><label>Disc</label> <input class="i-disc" placeholder="0" inputmode="decimal" /></div>
+      <div class="cell disc-cell"><label>Disc</label> <input class="i-disc" placeholder="0" inputmode="decimal" /></div>
+      <div class="cell free-cell"><label>Free</label> <input class="i-free" placeholder="0" inputmode="decimal" /></div>
     </div>
     <button type="button" class="del-btn" title="Remove" onclick="this.closest('.item').remove()">×</button>
   `;
@@ -537,9 +570,17 @@ function addItem(focusIt) {
     if (name) fetchLastPrices(name);
   });
   addItem(false);
+  document.getElementById("software").addEventListener("change", applySoftwareUI);
+  applySoftwareUI();
   checkDesktopStatus();
   setInterval(checkDesktopStatus, 25000);   // re-check every 25s
 })();
+
+// Show the Free-quantity column only when Vyapar is selected
+function applySoftwareUI() {
+  const isVyapar = currentSoftware() === "vyapar";
+  document.body.classList.toggle("show-free", isVyapar);
+}
 
 // ─── Desktop online indicator (reads the worker's heartbeat) ──
 const HB_TABLE = "app_heartbeat";
@@ -585,13 +626,21 @@ function collect() {
   rows.forEach(r => {
     const name = r.querySelector(".i-name").value.trim();
     if (!name) return;
-    items.push({
+    const it = {
       name,
       qty:  r.querySelector(".i-qty").value.trim() || "1",
       unit: r.querySelector(".i-unit").value.trim(),
       rate: r.querySelector(".i-rate").value.trim(),
-      disc: r.querySelector(".i-disc").value.trim() || "0",
-    });
+    };
+    if (software === "vyapar") {
+      // Vyapar: free quantity, no discount
+      it.disc = "0";
+      it.free = r.querySelector(".i-free").value.trim() || "0";
+    } else {
+      // Tally: discount, no free quantity
+      it.disc = r.querySelector(".i-disc").value.trim() || "0";
+    }
+    items.push(it);
   });
   if (items.length === 0) throw new Error("Add at least one item");
   const order_type = document.getElementById("order_type").value;
@@ -604,33 +653,53 @@ async function submitOrder() {
   let body;
   try { body = collect(); }
   catch (e) { toast(e.message, false); return; }
+  const editing = _editingId;
   btn.disabled = true;
-  btn.textContent = "Submitting…";
+  btn.textContent = editing ? "Updating…" : "Submitting…";
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
-      method: "POST",
-      headers: {
-        "apikey": SUPABASE_ANON_KEY,
-        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal",
-      },
-      body: JSON.stringify(body),
-    });
+    const headers = {
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal",
+    };
+    let res;
+    if (editing) {
+      // PATCH the existing order; reset status so a processed/failed one re-queues
+      res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${editing}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          party_name: body.party_name, software: body.software,
+          order_type: body.order_type, items: body.items,
+          notes: body.notes, status: "pending", result_message: "",
+        }),
+      });
+    } else {
+      res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+        method: "POST", headers, body: JSON.stringify(body),
+      });
+    }
     if (!res.ok) {
       const t = await res.text();
       throw new Error(`HTTP ${res.status}: ${t}`);
     }
-    toast("Order sent ✓");
-    document.getElementById("party").value = "";
-    document.getElementById("notes").value = "";
-    document.getElementById("items").innerHTML = "";
-    addItem(true);
+    if (editing) {
+      toast("Order updated ✓");
+      cancelEdit();
+      switchTab("pending");
+    } else {
+      toast("Order sent ✓");
+      document.getElementById("party").value = "";
+      document.getElementById("notes").value = "";
+      document.getElementById("items").innerHTML = "";
+      addItem(true);
+    }
   } catch (e) {
     toast("Failed: " + e.message, false);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Submit Order";
+    btn.textContent = _editingId ? "Update Order" : "Submit Order";
   }
 }
 
@@ -686,10 +755,15 @@ function renderPending() {
   }
   el.innerHTML = list.map(o => {
     const itemLines = (o.items || [])
-      .map(it => `${it.name} × ${it.qty}${it.unit ? ' ' + it.unit : ''}`)
+      .map(it => {
+        const freeTxt = (it.free && String(it.free) !== '0')
+          ? ` <span style="color:var(--success)">(+${escapeHtml(String(it.free))} free)</span>` : '';
+        const unitTxt = it.unit ? ' ' + escapeHtml(it.unit) : '';
+        return `${escapeHtml(it.name)} × ${escapeHtml(String(it.qty))}${unitTxt}${freeTxt}`;
+      })
       .join('<br>');
     const noteHtml = o.notes
-      ? `<p class="pending-note">📝 ${o.notes}</p>` : '';
+      ? `<p class="pending-note">📝 ${escapeHtml(o.notes)}</p>` : '';
     const swBadge = `<span class="badge badge-${o.software}">${o.software.toUpperCase()}</span>`;
     const typeBadge = o.order_type === 'market_yard'
       ? `<span class="badge badge-market">Market Yard</span>`
@@ -700,9 +774,76 @@ function renderPending() {
       <p class="pending-items">${itemLines}</p>
       ${noteHtml}
       <div class="pending-meta">${swBadge} ${typeBadge} <span>${ts}</span></div>
+      <div class="card-actions">
+        <button class="mini-btn" onclick="editOrder('${o.id}')">✎ Edit</button>
+        <button class="mini-btn mini-danger" onclick="deleteOrder('${o.id}', this)">🗑 Delete</button>
+      </div>
       <button class="proc-btn" onclick="processOrder('${o.id}', this)">⚡ Process now</button>
     </div>`;
   }).join('');
+}
+
+let _editingId = null;
+
+function editOrder(id) {
+  const o = _allPendingOrders.find(x => String(x.id) === String(id));
+  if (!o) return;
+  _editingId = id;
+  document.getElementById('party').value      = o.party_name || '';
+  document.getElementById('software').value   = o.software || 'vyapar';
+  document.getElementById('order_type').value = o.order_type || 'local';
+  document.getElementById('notes').value      = o.notes || '';
+  applySoftwareUI();
+
+  const itemsEl = document.getElementById('items');
+  itemsEl.innerHTML = '';
+  (o.items || []).forEach(it => {
+    addItem(false);
+    const row = itemsEl.lastElementChild;
+    row.querySelector('.i-name').value = it.name || '';
+    row.querySelector('.i-qty').value  = (it.qty  ?? '');
+    row.querySelector('.i-unit').value = it.unit || '';
+    row.querySelector('.i-rate').value = (it.rate ?? '');
+    row.querySelector('.i-disc').value = (it.disc ?? '');
+    const f = row.querySelector('.i-free');
+    if (f) f.value = (it.free ?? '');
+  });
+  if (!(o.items || []).length) addItem(false);
+
+  document.getElementById('edit-banner').style.display = '';
+  document.getElementById('submit').textContent = 'Update Order';
+  switchTab('new');
+  window.scrollTo(0, 0);
+}
+
+function cancelEdit() {
+  _editingId = null;
+  document.getElementById('edit-banner').style.display = 'none';
+  document.getElementById('submit').textContent = 'Submit Order';
+  document.getElementById('party').value = '';
+  document.getElementById('notes').value = '';
+  document.getElementById('items').innerHTML = '';
+  addItem(false);
+}
+
+async function deleteOrder(id, btn) {
+  if (!confirm('Delete this pending order? This cannot be undone.')) return;
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    _allPendingOrders = _allPendingOrders.filter(o => String(o.id) !== String(id));
+    renderPending();
+    toast('Order deleted ✓');
+  } catch (e) {
+    toast('Delete failed: ' + e.message, false);
+    btn.disabled = false;
+    btn.textContent = '🗑 Delete';
+  }
 }
 
 // ── Remote processing: ask the desktop app to bill this order ──
