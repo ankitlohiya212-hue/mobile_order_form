@@ -83,6 +83,10 @@
   body.show-free .free-cell { display:block; }   /* Vyapar: show Free… */
   body.show-free .disc-cell { display:none; }    /* …and hide Discount */
 
+  /* Number-of-prints selector — Vyapar only */
+  #prints-row { display:none; }
+  body.show-free #prints-row { display:block; }
+
   .del-btn {
     position:absolute; top:10px; right:10px;
     width:26px; height:26px; padding:0;
@@ -169,8 +173,28 @@
   .pending-card {
     background:var(--card); border:1px solid var(--border);
     border-radius:10px; padding:14px 16px; margin-bottom:10px;
+    display:flex; gap:12px; align-items:flex-start;
   }
+  .sel-box { width:22px; height:22px; flex:0 0 auto; margin-top:2px; accent-color:var(--accent); }
+  .pending-body { flex:1; min-width:0; }
   .pending-party { font-size:16px; font-weight:700; margin:0 0 6px; }
+
+  /* Sticky bulk-process bar */
+  .bulk-bar {
+    position:sticky; bottom:0; z-index:50;
+    display:flex; align-items:center; gap:10px;
+    background:#1f2024; color:#fff; padding:12px 14px;
+    border-radius:12px; margin-top:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.25);
+  }
+  #bulk-info { flex:1; font-size:14px; font-weight:600; }
+  .bulk-bar button {
+    width:auto; padding:9px 14px; font-size:13px; font-weight:600;
+    border:none; border-radius:8px; cursor:pointer;
+  }
+  .bulk-process { background:var(--accent); color:#fff; }
+  .bulk-process:disabled { background:#9cc5ff; cursor:not-allowed; }
+  .bulk-clear { background:transparent; color:#cbd2dc; border:1px solid #3a3d44 !important; }
   .pending-items { font-size:14px; color:var(--muted); line-height:1.7; margin:0 0 6px; }
   .pending-note { font-size:13px; color:var(--accent); margin:0; }
   .pending-meta {
@@ -309,6 +333,13 @@
         </select>
       </div>
     </div>
+    <div id="prints-row" style="margin-top:10px;">
+      <label>Number of prints</label>
+      <select id="print_copies">
+        <option value="1">1 print</option>
+        <option value="2">2 prints</option>
+      </select>
+    </div>
   </div>
 
   <div class="card">
@@ -344,6 +375,12 @@
     <button id="type-btn-market_yard" onclick="filterType('market_yard')">Market Yard</button>
   </div>
   <div id="pending-list"><div class="pending-empty">Loading…</div></div>
+
+  <div id="bulk-bar" class="bulk-bar" style="display:none;">
+    <span id="bulk-info">0 selected</span>
+    <button id="bulk-process" class="bulk-process" onclick="processSelected()">⚡ Process selected</button>
+    <button class="bulk-clear" onclick="clearSelection()">Clear</button>
+  </div>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -645,7 +682,10 @@ function collect() {
   if (items.length === 0) throw new Error("Add at least one item");
   const order_type = document.getElementById("order_type").value;
   const notes = document.getElementById("notes").value.trim();
-  return { party_name: party, software, order_type, items, notes, source: "mobile" };
+  // Number of prints (Vyapar only; harmless default of 1 otherwise)
+  const print_copies = software === "vyapar"
+    ? (parseInt(document.getElementById("print_copies").value, 10) || 1) : 1;
+  return { party_name: party, software, order_type, items, notes, print_copies, source: "mobile" };
 }
 
 async function submitOrder() {
@@ -672,7 +712,8 @@ async function submitOrder() {
         body: JSON.stringify({
           party_name: body.party_name, software: body.software,
           order_type: body.order_type, items: body.items,
-          notes: body.notes, status: "pending", result_message: "",
+          notes: body.notes, print_copies: body.print_copies,
+          status: "pending", result_message: "",
         }),
       });
     } else {
@@ -692,6 +733,7 @@ async function submitOrder() {
       toast("Order sent ✓");
       document.getElementById("party").value = "";
       document.getElementById("notes").value = "";
+      document.getElementById("print_copies").value = "1";
       document.getElementById("items").innerHTML = "";
       addItem(true);
     }
@@ -769,18 +811,25 @@ function renderPending() {
       ? `<span class="badge badge-market">Market Yard</span>`
       : `<span class="badge badge-local">Local</span>`;
     const ts = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    const checked = _selectedIds.has(String(o.id)) ? 'checked' : '';
     return `<div class="pending-card" data-id="${o.id}">
-      <p class="pending-party">${escapeHtml(o.party_name)}</p>
-      <p class="pending-items">${itemLines}</p>
-      ${noteHtml}
-      <div class="pending-meta">${swBadge} ${typeBadge} <span>${ts}</span></div>
-      <div class="card-actions">
-        <button class="mini-btn" onclick="editOrder('${o.id}')">✎ Edit</button>
-        <button class="mini-btn mini-danger" onclick="deleteOrder('${o.id}', this)">🗑 Delete</button>
+      <input type="checkbox" class="sel-box" ${checked}
+             title="Select for bulk processing"
+             onchange="toggleSelect('${o.id}', this)">
+      <div class="pending-body">
+        <p class="pending-party">${escapeHtml(o.party_name)}</p>
+        <p class="pending-items">${itemLines}</p>
+        ${noteHtml}
+        <div class="pending-meta">${swBadge} ${typeBadge} <span>${ts}</span></div>
+        <div class="card-actions">
+          <button class="mini-btn" onclick="editOrder('${o.id}')">✎ Edit</button>
+          <button class="mini-btn mini-danger" onclick="deleteOrder('${o.id}', this)">🗑 Delete</button>
+        </div>
+        <button class="proc-btn" onclick="processOrder('${o.id}', this)">⚡ Process now</button>
       </div>
-      <button class="proc-btn" onclick="processOrder('${o.id}', this)">⚡ Process now</button>
     </div>`;
   }).join('');
+  updateBulkBar();
 }
 
 let _editingId = null;
@@ -789,10 +838,11 @@ function editOrder(id) {
   const o = _allPendingOrders.find(x => String(x.id) === String(id));
   if (!o) return;
   _editingId = id;
-  document.getElementById('party').value      = o.party_name || '';
-  document.getElementById('software').value   = o.software || 'vyapar';
-  document.getElementById('order_type').value = o.order_type || 'local';
-  document.getElementById('notes').value      = o.notes || '';
+  document.getElementById('party').value        = o.party_name || '';
+  document.getElementById('software').value     = o.software || 'vyapar';
+  document.getElementById('order_type').value   = o.order_type || 'local';
+  document.getElementById('notes').value        = o.notes || '';
+  document.getElementById('print_copies').value = String(o.print_copies || 1);
   applySoftwareUI();
 
   const itemsEl = document.getElementById('items');
@@ -822,6 +872,7 @@ function cancelEdit() {
   document.getElementById('submit').textContent = 'Submit Order';
   document.getElementById('party').value = '';
   document.getElementById('notes').value = '';
+  document.getElementById('print_copies').value = '1';
   document.getElementById('items').innerHTML = '';
   addItem(false);
 }
@@ -850,16 +901,12 @@ async function deleteOrder(id, btn) {
 const PROCESS_POLL_MS = 4000;
 const PROCESS_TIMEOUT_MS = 120000;   // 2 min before we give up waiting
 
-async function processOrder(id, btn) {
-  if (!confirm('Process this order now on the shop computer?')) return;
-  const card = btn.closest('.pending-card');
-
-  // Pause the list auto-refresh so it doesn't wipe this card mid-processing
-  clearInterval(_pendingPollTimer); _pendingPollTimer = null;
-  setCardStatus(card, 'wait', '⏳ Sent to desktop — waiting for it to process…');
-
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+// Core: flag one order for the desktop and wait until it finishes.
+// Resolves true on success, false on failure/timeout. Caller manages poll pause/resume.
+function awaitProcess(id, card) {
+  return new Promise((resolve) => {
+    setCardStatus(card, 'wait', '⏳ Sent to desktop — waiting…');
+    fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
       method: 'PATCH',
       headers: {
         apikey: SUPABASE_ANON_KEY,
@@ -867,66 +914,131 @@ async function processOrder(id, btn) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status: 'process_requested', result_message: '' }),
+    }).then((r) => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const started = Date.now();
+      const poll = async () => {
+        if (Date.now() - started > PROCESS_TIMEOUT_MS) {
+          setCardStatus(card, 'fail',
+            '⚠ No response from the desktop. Make sure the billing app is running on the shop PC.');
+          return resolve(false);
+        }
+        try {
+          const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}&select=status,result_message`,
+            { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+          const rows = await res.json();
+          if (!rows.length) {                          // row gone → processed & cleaned up
+            setCardStatus(card, 'ok', '✓ Processed.');
+            return resolve(true);
+          }
+          const row = rows[0];
+          if (row.status === 'done') {
+            setCardStatus(card, 'ok', '✓ ' + escapeHtml(row.result_message || 'Done.'));
+            deleteOrderRow(id);
+            return resolve(true);
+          }
+          if (row.status === 'failed') {
+            setCardStatus(card, 'fail', '✗ ' + escapeHtml(row.result_message || 'Processing failed.'));
+            deleteOrderRow(id);
+            return resolve(false);
+          }
+          setCardStatus(card, 'wait',
+            row.status === 'processing' ? '⚙ Processing on desktop…' : '⏳ Waiting for desktop…');
+          setTimeout(poll, PROCESS_POLL_MS);
+        } catch (e) {
+          setTimeout(poll, PROCESS_POLL_MS);           // transient network blip — retry
+        }
+      };
+      setTimeout(poll, PROCESS_POLL_MS);
+    }).catch((e) => {
+      setCardStatus(card, 'fail', '✗ Could not reach the server: ' + escapeHtml(e.message));
+      resolve(false);
     });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-  } catch (e) {
-    setCardStatus(card, 'fail', '✗ Could not reach the server: ' + escapeHtml(e.message));
-    resumePending();
-    return;
+  });
+}
+
+async function processOrder(id, btn) {
+  if (!confirm('Process this order now on the shop computer?')) return;
+  const card = btn.closest('.pending-card');
+  // Pause the list auto-refresh so it doesn't wipe this card mid-processing
+  clearInterval(_pendingPollTimer); _pendingPollTimer = null;
+  await awaitProcess(id, card);
+  setTimeout(resumePending, 2500);
+}
+
+// ── Bulk processing: process every ticked order, one by one ──
+const _selectedIds = new Set();
+
+function toggleSelect(id, cb) {
+  if (cb.checked) _selectedIds.add(String(id));
+  else _selectedIds.delete(String(id));
+  updateBulkBar();
+}
+
+function clearSelection() {
+  _selectedIds.clear();
+  document.querySelectorAll('.sel-box').forEach(cb => { cb.checked = false; });
+  updateBulkBar();
+}
+
+// Selected ids that are actually visible in the current Local/Market-Yard tab
+function selectedInView() {
+  const visible = new Set(
+    _allPendingOrders
+      .filter(o => (o.order_type || 'local') === _activeType)
+      .map(o => String(o.id)));
+  return [..._selectedIds].filter(id => visible.has(id));
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  if (!bar) return;
+  const ids = selectedInView();
+  if (ids.length) {
+    bar.style.display = '';
+    document.getElementById('bulk-info').textContent = `${ids.length} selected`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+async function processSelected() {
+  const ids = selectedInView();
+  if (!ids.length) return;
+  if (!confirm(`Process ${ids.length} selected order(s) one by one on the shop computer?`)) return;
+
+  clearInterval(_pendingPollTimer); _pendingPollTimer = null;
+  const info    = document.getElementById('bulk-info');
+  const procBtn = document.getElementById('bulk-process');
+  procBtn.disabled = true;
+
+  let ok = 0;
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    info.textContent = `Processing ${i + 1} of ${ids.length}…`;
+    const card = document.querySelector(`.pending-card[data-id="${id}"]`);
+    if (card) card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const success = await awaitProcess(id, card);   // wait for THIS one before the next
+    if (success) ok++;
+    _selectedIds.delete(String(id));
   }
 
-  const started = Date.now();
-  const poll = async () => {
-    if (Date.now() - started > PROCESS_TIMEOUT_MS) {
-      setCardStatus(card, 'fail',
-        '⚠ No response from the desktop. Make sure the billing app is running on the shop PC, then try again.');
-      resumePending();
-      return;
-    }
-    try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}&select=status,result_message`,
-        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
-      const rows = await res.json();
-
-      if (!rows.length) {              // row gone → processed & cleaned up
-        setCardStatus(card, 'ok', '✓ Processed.');
-        setTimeout(resumePending, 2500);
-        return;
-      }
-      const row = rows[0];
-      if (row.status === 'done') {
-        setCardStatus(card, 'ok', '✓ ' + escapeHtml(row.result_message || 'Done.'));
-        deleteOrderRow(id);
-        setTimeout(resumePending, 3000);
-        return;
-      }
-      if (row.status === 'failed') {
-        setCardStatus(card, 'fail', '✗ ' + escapeHtml(row.result_message || 'Processing failed.'));
-        deleteOrderRow(id);
-        setTimeout(resumePending, 4000);
-        return;
-      }
-      // still process_requested or processing → keep waiting
-      setCardStatus(card, 'wait',
-        row.status === 'processing' ? '⚙ Processing on desktop…' : '⏳ Waiting for desktop…');
-      setTimeout(poll, PROCESS_POLL_MS);
-    } catch (e) {
-      setTimeout(poll, PROCESS_POLL_MS);   // transient network blip — retry
-    }
-  };
-  setTimeout(poll, PROCESS_POLL_MS);
+  info.textContent = `Done: ${ok}/${ids.length} processed`;
+  procBtn.disabled = false;
+  setTimeout(() => { document.getElementById('bulk-bar').style.display = 'none'; resumePending(); }, 3000);
 }
 
 function setCardStatus(card, kind, msg) {
   if (!card) return;
+  const body = card.querySelector('.pending-body') || card;
   const btn = card.querySelector('.proc-btn');
   if (btn) btn.disabled = true;
-  let el = card.querySelector('.proc-status');
+  let el = body.querySelector('.proc-status');
   if (!el) {
     el = document.createElement('div');
     el.className = 'proc-status';
-    card.appendChild(el);
+    body.appendChild(el);
   }
   el.className = 'proc-status proc-' + kind;
   el.innerHTML = msg;
