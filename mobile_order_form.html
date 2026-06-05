@@ -264,6 +264,12 @@
   .proc-wait { background:#fff7e6; color:#8a6d3b; }
   .proc-ok   { background:#e6f7ec; color:var(--success); }
   .proc-fail { background:#fdecec; color:var(--danger); }
+  .stop-btn {
+    margin-top:10px; width:100%; padding:10px; font-size:14px; font-weight:600;
+    border:1px solid var(--danger); background:#fff; color:var(--danger);
+    border-radius:8px; cursor:pointer;
+  }
+  .stop-btn:disabled { opacity:0.6; cursor:not-allowed; }
 
   /* ── Pending card Edit / Delete buttons ── */
   .card-actions { display:flex; gap:8px; margin-top:10px; }
@@ -932,6 +938,10 @@ async function deleteOrder(id, btn) {
 const PROCESS_POLL_MS = 4000;
 const PROCESS_TIMEOUT_MS = 120000;   // 2 min before we give up waiting
 
+const _cancelled = new Set();   // order ids the user asked to stop (and we reverted)
+let _bulkStop = false;          // set when the user stops a bulk run
+let _bulkCurrentId = null;      // the order currently being processed in a bulk run
+
 // Core: flag one order for the desktop and wait until it finishes.
 // Resolves true on success, false on failure/timeout. Caller manages poll pause/resume.
 function awaitProcess(id, card) {
@@ -949,6 +959,11 @@ function awaitProcess(id, card) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const started = Date.now();
       const poll = async () => {
+        if (_cancelled.has(String(id))) {              // user stopped it (and we reverted to pending)
+          _cancelled.delete(String(id));
+          setCardStatus(card, 'fail', '■ Stopped — moved back to pending.');
+          return resolve(false);
+        }
         if (Date.now() - started > PROCESS_TIMEOUT_MS) {
           setCardStatus(card, 'fail',
             '⚠ No response from the desktop. Make sure the billing app is running on the shop PC.');
@@ -1042,20 +1057,31 @@ async function processSelected() {
   clearInterval(_pendingPollTimer); _pendingPollTimer = null;
   const info    = document.getElementById('bulk-info');
   const procBtn = document.getElementById('bulk-process');
-  procBtn.disabled = true;
+  _bulkStop = false;
+  procBtn.textContent = '■ Stop';
+  procBtn.onclick = stopBulk;          // the button becomes "Stop" during the run
 
-  let ok = 0;
+  let ok = 0, done = 0;
   for (let i = 0; i < ids.length; i++) {
+    if (_bulkStop) break;
     const id = ids[i];
+    _bulkCurrentId = id;
     info.textContent = `Processing ${i + 1} of ${ids.length}…`;
     const card = document.querySelector(`.pending-card[data-id="${id}"]`);
     if (card) card.scrollIntoView({ block: 'center', behavior: 'smooth' });
     const success = await awaitProcess(id, card);   // wait for THIS one before the next
     if (success) ok++;
+    done++;
     _selectedIds.delete(String(id));
+    if (_bulkStop) break;
   }
+  _bulkCurrentId = null;
 
-  info.textContent = `Done: ${ok}/${ids.length} processed`;
+  info.textContent = _bulkStop
+    ? `Stopped after ${done}/${ids.length} (${ok} done)`
+    : `Done: ${ok}/${ids.length} processed`;
+  procBtn.textContent = '⚡ Process selected';
+  procBtn.onclick = processSelected;
   procBtn.disabled = false;
   setTimeout(() => { document.getElementById('bulk-bar').style.display = 'none'; resumePending(); }, 3000);
 }
@@ -1073,6 +1099,55 @@ function setCardStatus(card, kind, msg) {
   }
   el.className = 'proc-status proc-' + kind;
   el.innerHTML = msg;
+
+  // Show a Stop button only while the order is waiting/processing
+  let stop = body.querySelector('.stop-btn');
+  if (kind === 'wait') {
+    if (!stop) {
+      stop = document.createElement('button');
+      stop.className = 'stop-btn';
+      stop.textContent = '■ Stop';
+      const id = card.dataset.id;
+      stop.onclick = () => stopProcessing(id, stop);
+      body.appendChild(stop);
+    }
+  } else if (stop) {
+    stop.remove();
+  }
+}
+
+// Attempt to stop an order. Only possible while it is still queued
+// (status 'process_requested'); once the desktop has claimed it, it's too late.
+async function stopProcessing(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Stopping…'; }
+  let reverted = false;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}&status=eq.process_requested`, {
+        method: 'PATCH',
+        headers: {
+          apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json', Prefer: 'return=representation',
+        },
+        body: JSON.stringify({ status: 'pending', result_message: '' }),
+      });
+    const rows = await res.json();
+    reverted = !!(rows && rows.length);
+  } catch (e) { /* network blip — treat as not reverted */ }
+
+  if (reverted) {
+    _cancelled.add(String(id));   // awaitProcess's poll will bail with "Stopped"
+  } else {
+    // Desktop already started billing this one — can't safely interrupt it
+    const card = document.querySelector(`.pending-card[data-id="${id}"]`);
+    setCardStatus(card, 'wait', '⚙ Already processing on the shop computer — can’t stop now.');
+    if (btn) { btn.disabled = false; btn.textContent = '■ Stop'; }
+  }
+}
+
+function stopBulk() {
+  _bulkStop = true;
+  if (_bulkCurrentId) stopProcessing(_bulkCurrentId, null);
 }
 
 function deleteOrderRow(id) {
