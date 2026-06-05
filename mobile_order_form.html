@@ -195,6 +195,24 @@
   .bulk-process { background:var(--accent); color:#fff; }
   .bulk-process:disabled { background:#9cc5ff; cursor:not-allowed; }
   .bulk-clear { background:transparent; color:#cbd2dc; border:1px solid #3a3d44 !important; }
+
+  /* ── Printable order list (hidden on screen, shown only when printing) ── */
+  #print-area { display:none; }
+  @media print {
+    body * { visibility:hidden; }
+    #print-area, #print-area * { visibility:visible; }
+    #print-area {
+      display:block; position:absolute; left:0; top:0; width:100%;
+      padding:10px; color:#000; font-family:Arial, sans-serif;
+    }
+    #print-area h2 { font-size:20px; margin:0 0 2px; }
+    .p-date { color:#555; font-size:12px; margin-bottom:8px; }
+    .p-order { border-bottom:1px solid #bbb; padding:8px 0; page-break-inside:avoid; }
+    .p-party { font-size:17px; font-weight:bold; margin-bottom:4px; }
+    .p-sw { font-size:11px; background:#222; color:#fff; padding:1px 6px; border-radius:4px; vertical-align:middle; }
+    .p-item { display:flex; justify-content:space-between; gap:16px; font-size:15px; padding:2px 0; }
+    .p-note { font-style:italic; color:#555; font-size:13px; margin-top:3px; }
+  }
   .pending-items { font-size:14px; color:var(--muted); line-height:1.7; margin:0 0 6px; }
   .pending-note { font-size:13px; color:var(--accent); margin:0; }
   .pending-meta {
@@ -299,8 +317,9 @@
   <h1>Orders</h1>
 
   <div class="top-nav">
-    <button class="active" onclick="switchTab('new')">New Order</button>
-    <button onclick="switchTab('pending')">Pending</button>
+    <button class="active" data-tab="new" onclick="switchTab('new')">New Order</button>
+    <button data-tab="pending" onclick="switchTab('pending')">Pending</button>
+    <button data-tab="past" onclick="switchTab('past')">Past Orders</button>
   </div>
 
   <div id="desktop-status" class="desk-status desk-unknown">Checking shop computer…</div>
@@ -368,6 +387,7 @@
 <!-- ── Pending Orders section ── -->
 <div id="tab-pending" style="display:none;">
   <div class="pending-refresh">
+    <button onclick="printList()">🖨 Print list</button>
     <button onclick="loadPending()">↺ Refresh</button>
   </div>
   <div class="type-tabs">
@@ -383,7 +403,16 @@
   </div>
 </div>
 
+<!-- ── Past Orders section ── -->
+<div id="tab-past" style="display:none;">
+  <div class="pending-refresh">
+    <button onclick="loadExecuted()">↺ Refresh</button>
+  </div>
+  <div id="executed-list"><div class="pending-empty">Loading…</div></div>
+</div>
+
 <div id="toast" class="toast"></div>
+<div id="print-area"></div>
 
 <script>
 // <<< CATALOG START (generated — do not edit by hand) >>>
@@ -753,8 +782,9 @@ let _activeType = 'local';
 function switchTab(tab) {
   document.getElementById('tab-new').style.display     = tab === 'new'     ? '' : 'none';
   document.getElementById('tab-pending').style.display = tab === 'pending' ? '' : 'none';
-  document.querySelectorAll('.top-nav button').forEach((b, i) => {
-    b.classList.toggle('active', (i === 0 && tab === 'new') || (i === 1 && tab === 'pending'));
+  document.getElementById('tab-past').style.display    = tab === 'past'    ? '' : 'none';
+  document.querySelectorAll('.top-nav button').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
   });
   if (tab === 'pending') {
     loadPending();
@@ -764,6 +794,7 @@ function switchTab(tab) {
     clearInterval(_pendingPollTimer);
     _pendingPollTimer = null;
   }
+  if (tab === 'past') loadExecuted();
 }
 
 function filterType(type) {
@@ -1054,6 +1085,109 @@ function deleteOrderRow(id) {
 function resumePending() {
   if (!_pendingPollTimer) _pendingPollTimer = setInterval(loadPending, 30000);
   loadPending();
+}
+
+// ── Past Orders (executed) ────────────────────────────────
+const EXEC_TABLE = "executed_orders";
+let _executedOrders = [];
+
+async function loadExecuted() {
+  const el = document.getElementById('executed-list');
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${EXEC_TABLE}?select=*&order=executed_at.desc&limit=100`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    _executedOrders = await res.json();
+    renderExecuted();
+  } catch (e) {
+    el.innerHTML = `<div class="pending-empty">⚠ ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderExecuted() {
+  const el = document.getElementById('executed-list');
+  if (!_executedOrders.length) {
+    el.innerHTML = '<div class="pending-empty">No past orders yet</div>';
+    return;
+  }
+  el.innerHTML = _executedOrders.map(o => {
+    const itemLines = (o.items || []).map(it => {
+      const freeTxt = (it.free && String(it.free) !== '0')
+        ? ` <span style="color:var(--success)">(+${escapeHtml(String(it.free))} free)</span>` : '';
+      const unitTxt = it.unit ? ' ' + escapeHtml(it.unit) : '';
+      return `${escapeHtml(it.name)} × ${escapeHtml(String(it.qty))}${unitTxt}${freeTxt}`;
+    }).join('<br>');
+    const swBadge = `<span class="badge badge-${o.software}">${(o.software || '').toUpperCase()}</span>`;
+    const typeBadge = o.order_type === 'market_yard'
+      ? `<span class="badge badge-market">Market Yard</span>`
+      : `<span class="badge badge-local">Local</span>`;
+    const when = o.executed_at
+      ? new Date(o.executed_at).toLocaleString([], {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    return `<div class="pending-card">
+      <div class="pending-body">
+        <p class="pending-party">${escapeHtml(o.party_name)}</p>
+        <p class="pending-items">${itemLines}</p>
+        <div class="pending-meta">${swBadge} ${typeBadge} <span>${when}</span></div>
+        <button class="mini-btn" onclick="restoreExecuted('${o.id}', this)">↩ Restore to Pending</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function restoreExecuted(id, btn) {
+  const o = _executedOrders.find(x => String(x.id) === String(id));
+  if (!o) return;
+  if (!confirm(`Add "${o.party_name}" back to pending orders?`)) return;
+  btn.disabled = true;
+  btn.textContent = 'Restoring…';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json', 'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        party_name: o.party_name, items: o.items, software: o.software,
+        order_type: o.order_type || 'local', notes: o.notes || '',
+        print_copies: o.print_copies || 1, source: 'restored', status: 'pending',
+      }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    toast('Restored to pending ✓');
+    btn.textContent = '✓ Restored';
+  } catch (e) {
+    toast('Restore failed: ' + e.message, false);
+    btn.disabled = false;
+    btn.textContent = '↩ Restore to Pending';
+  }
+}
+
+// ── Print the pending order list (selected, or all in current tab) ──
+function printList() {
+  const list = _allPendingOrders.filter(o => (o.order_type || 'local') === _activeType);
+  const sel = selectedInView();
+  const toPrint = sel.length ? list.filter(o => sel.includes(String(o.id))) : list;
+  if (!toPrint.length) { toast('No orders to print', false); return; }
+
+  const title = _activeType === 'market_yard' ? 'Market Yard' : 'Local';
+  let html = `<h2>Pending Orders — ${title}</h2>`
+           + `<div class="p-date">${new Date().toLocaleString()}</div>`;
+  toPrint.forEach(o => {
+    const items = (o.items || []).map(it => {
+      const free = (it.free && String(it.free) !== '0') ? ` (+${escapeHtml(String(it.free))} free)` : '';
+      const unit = it.unit ? ' ' + escapeHtml(it.unit) : '';
+      const rate = it.rate ? '  @ ' + escapeHtml(String(it.rate)) : '';
+      return `<div class="p-item"><span>${escapeHtml(it.name)}</span>`
+           + `<span>${escapeHtml(String(it.qty))}${unit}${free}${rate}</span></div>`;
+    }).join('');
+    const note = o.notes ? `<div class="p-note">Note: ${escapeHtml(o.notes)}</div>` : '';
+    html += `<div class="p-order"><div class="p-party">${escapeHtml(o.party_name)} `
+          + `<span class="p-sw">${(o.software || '').toUpperCase()}</span></div>${items}${note}</div>`;
+  });
+  document.getElementById('print-area').innerHTML = html;
+  window.print();
 }
 </script>
 </body>
