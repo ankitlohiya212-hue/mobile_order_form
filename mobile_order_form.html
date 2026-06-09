@@ -901,7 +901,7 @@ async function loadPending() {
     // Include in-progress orders so that if the page was closed while an order
     // was being processed, we can auto-resume watching it when the page reopens.
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(pending,process_requested,processing)&select=*&order=created_at.asc`,
+      `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(pending,process_requested,processing,failed)&select=*&order=created_at.asc`,
       { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -939,9 +939,17 @@ function renderPending() {
     const checked = _selectedIds.has(String(o.id)) ? 'checked' : '';
     // Disable Process button for orders that are already in-flight
     const inFlight = ['process_requested','processing'].includes(o.status);
+    const failed   = o.status === 'failed';
     const procBtnHtml = inFlight
       ? `<button class="proc-btn" disabled>⚙ Processing…</button>`
-      : `<button class="proc-btn" onclick="processOrder('${o.id}', this)">⚡ Process now</button>`;
+      : failed
+        ? `<button class="proc-btn" style="background:#C9582E"
+                   onclick="retryOrder('${o.id}', this)">↻ Retry</button>`
+        : `<button class="proc-btn" onclick="processOrder('${o.id}', this)">⚡ Process now</button>`;
+    // Show the failure reason so the operator knows WHY it didn't process.
+    const failHtml = (failed && o.result_message)
+      ? `<p class="pending-note" style="color:#E0556B;background:#3a1f24">✗ ${escapeHtml(o.result_message)}</p>`
+      : '';
     return `<div class="pending-card" data-id="${o.id}">
       <input type="checkbox" class="sel-box" ${checked}
              title="Select for bulk processing"
@@ -950,6 +958,7 @@ function renderPending() {
         <p class="pending-party">${escapeHtml(o.party_name)}</p>
         <p class="pending-items">${itemLines}</p>
         ${noteHtml}
+        ${failHtml}
         <div class="pending-meta">${swBadge} ${typeBadge} <span>${ts}</span></div>
         <div class="card-actions">
           <button class="mini-btn" onclick="editOrder('${o.id}')">✎ Edit</button>
@@ -1086,7 +1095,9 @@ function awaitProcess(id, card, skipRequest = false) {
         }
         if (row.status === 'failed') {
           setCardStatus(card, 'fail', '✗ ' + escapeHtml(row.result_message || 'Processing failed.'));
-          deleteOrderRow(id);
+          // Keep the failed order so the operator can see the error and retry.
+          // (Previously deleted here, which made failures vanish without a trace.)
+          loadPending();
           return resolve(false);
         }
         setCardStatus(card, 'wait',
@@ -1126,6 +1137,16 @@ async function processOrder(id, btn) {
   if (!confirm('Process this order now on the shop computer?')) return;
   const card = btn.closest('.pending-card');
   // Pause the list auto-refresh so it doesn't wipe this card mid-processing
+  clearInterval(_pendingPollTimer); _pendingPollTimer = null;
+  await awaitProcess(id, card);
+  setTimeout(resumePending, 2500);
+}
+
+// Retry a previously-failed order. awaitProcess re-flags it process_requested,
+// so the desktop picks it up again; the old failure message is cleared on success.
+async function retryOrder(id, btn) {
+  if (!confirm('Retry processing this order on the shop computer?')) return;
+  const card = btn.closest('.pending-card');
   clearInterval(_pendingPollTimer); _pendingPollTimer = null;
   await awaitProcess(id, card);
   setTimeout(resumePending, 2500);
