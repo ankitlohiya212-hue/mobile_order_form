@@ -132,6 +132,8 @@
     border-radius:8px; font-size:15px; font-weight:600;
     color:var(--text);
   }
+  #bill-total.incomplete { background:transparent; color:var(--muted); font-weight:500; }
+  #total-note { font-weight:500; font-size:12px; color:var(--muted); }
 
   .hint { color:var(--muted); font-size:12px; margin-top:8px; text-align:center; }
   kbd {
@@ -388,7 +390,7 @@
       <span>Item</span><span>Qty</span><span>Unit</span><span>Rate</span><span class="disc-head">Disc</span><span class="free-head">Free</span><span></span>
     </div>
     <div id="items"></div>
-    <div id="bill-total">Total: ₹<span id="total-amount">0</span></div>
+    <div id="bill-total">Total: ₹<span id="total-amount">0</span><span id="total-note"></span></div>
     <button type="button" class="add-item" onclick="addItem(true)">+ Add Item</button>
   </div>
 
@@ -691,19 +693,35 @@ function applyOrderTypeUI() {
 
 // Live bill total — sum of qty × rate across all item rows
 function updateTotal() {
-  let total = 0;
+  // Only show the final bill total once EVERY named item has a rate. If some
+  // items are still missing rates, the running sum would be misleading, so we
+  // show a muted "add rates" hint instead of a confident total.
+  let total = 0, named = 0, priced = 0;
   document.querySelectorAll("#items .item").forEach(r => {
+    const name = r.querySelector(".i-name").value.trim();
+    if (!name) return;                       // ignore blank/trailing rows
+    named++;
     const qty  = parseFloat(r.querySelector(".i-qty").value)  || 0;
     const rate = parseFloat(r.querySelector(".i-rate").value) || 0;
-    total += qty * rate;
+    if (rate > 0) { priced++; total += qty * rate; }
   });
+
   const el   = document.getElementById("bill-total");
   const span = document.getElementById("total-amount");
-  if (total > 0) {
-    el.style.display   = "";
-    span.textContent   = total.toLocaleString("en-IN", { maximumFractionDigits: 2 });
-  } else {
-    el.style.display = "none";
+  const note = document.getElementById("total-note");
+
+  if (named === 0) { el.style.display = "none"; return; }
+  el.style.display = "";
+
+  if (priced === named) {                    // all items priced → confident total
+    el.classList.remove("incomplete");
+    span.textContent = total.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+    note.textContent = "";
+  } else {                                    // some rates missing → hint, not a total
+    el.classList.add("incomplete");
+    const missing = named - priced;
+    span.textContent = total.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+    note.textContent = `  · add rate${missing > 1 ? "s" : ""} for ${missing} more item${missing > 1 ? "s" : ""}`;
   }
 }
 
@@ -847,6 +865,20 @@ async function submitOrder() {
 
 // Submit the order AND immediately send it to the desktop for processing.
 async function submitAndProcess() {
+  // Confirm before firing a real bill on the shop computer. Show a summary so
+  // the operator knows exactly what's about to be created and printed.
+  const party = document.getElementById("party").value.trim();
+  const itemCount = [...document.querySelectorAll("#items .item")]
+      .filter(r => r.querySelector(".i-name").value.trim()).length;
+  const totalTxt = document.getElementById("total-amount").textContent;
+  const summary =
+      "Submit and process this order on the shop computer now?\n\n" +
+      `Party: ${party || "(none)"}\n` +
+      `Items: ${itemCount}\n` +
+      `Total: ₹${totalTxt}\n\n` +
+      "This will create and print the bill immediately.";
+  if (!confirm(summary)) return;
+
   const procBtn = document.getElementById("submit-process");
   procBtn.disabled = true;
   procBtn.textContent = "Submitting…";
