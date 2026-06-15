@@ -1,0 +1,8 @@
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/"
+  to = "/mobile_order_form.html"
+  status = 301
+  force = true
