@@ -662,7 +662,7 @@ function addItem(focusIt) {
   row.querySelector(".i-disc")?.addEventListener("input", updateTotal);
   // blur: secondary trigger if user types name manually
   nameEl.addEventListener("blur", () => setTimeout(() => applyLastPrice(nameEl, rateEl, unitEl), 120));
-  if (focusIt) nameEl.focus();
+  if (focusIt) { nameEl.focus(); nameEl.scrollIntoView({ behavior: "smooth", block: "center" }); }
 }
 
 (function init() {
