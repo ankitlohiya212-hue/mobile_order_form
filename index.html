@@ -1,0 +1,1461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
+<title>New Order</title>
+<style>
+  :root {
+    --accent:#0a84ff;
+    --accent-soft:#eaf2ff;
+    --bg:#f5f6f8;
+    --card:#ffffff;
+    --border:#e4e6eb;
+    --border-strong:#d0d3d9;
+    --text:#141414;
+    --muted:#6b7280;
+    --danger:#c2373b;
+    --success:#1e8e3e;
+    --radius:12px;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body {
+    margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,sans-serif;
+    font-size:16px; line-height:1.4;
+  }
+  .wrap { max-width:640px; margin:0 auto; padding:20px 16px 120px; }
+  h1 { font-size:24px; font-weight:600; letter-spacing:-0.01em; margin:0 0 18px; }
+
+  .card {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .card-title {
+    font-size:13px; font-weight:600; color:var(--muted);
+    text-transform:uppercase; letter-spacing:0.04em;
+    margin:0 0 12px;
+  }
+
+  label {
+    display:block; font-size:12px; color:var(--muted);
+    margin-bottom:6px; font-weight:500;
+  }
+
+  input, select, button, textarea {
+    width:100%; padding:12px 14px; font-size:16px;
+    border:1px solid var(--border);
+    border-radius:10px; background:#fff; color:var(--text);
+    outline:none;
+    transition:border-color .15s, box-shadow .15s;
+    font-family:inherit;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(10,132,255,0.15);
+  }
+
+  select {
+    appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%236b7280' d='M6 8L0 0h12z'/></svg>");
+    background-repeat:no-repeat; background-position:right 14px center; padding-right:36px;
+  }
+
+  .item {
+    position:relative;
+    background:#fafbfc;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px;
+    margin-bottom:10px;
+  }
+  .item-name-row { margin-bottom:10px; padding-right:32px; }
+  .item-fields { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+  .item-fields input { padding:10px 8px; font-size:15px; text-align:center; }
+  .item-fields .cell label { text-align:center; font-size:11px; }
+
+  /* Vyapar shows Free; Tally shows Discount. Exactly one is visible at a time,
+     so each item row always has 4 numeric fields and the item-name row stays roomy. */
+  .free-cell, .free-head { display:none; }       /* default (Tally): Free hidden */
+  body.show-free .free-cell { display:block; }   /* Vyapar: show Free… */
+  body.show-free .disc-cell { display:none; }    /* …and hide Discount */
+
+  /* Number-of-prints selector — Vyapar only */
+  #prints-row { display:none; }
+  body.show-free #prints-row { display:block; }
+
+  .del-btn {
+    position:absolute; top:10px; right:10px;
+    width:26px; height:26px; padding:0;
+    border-radius:50%; background:#fff; border:1px solid var(--border);
+    color:var(--danger); font-size:16px; font-weight:bold; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .del-btn:hover { background:#fff0f0; border-color:#f5c2c4; }
+
+  .add-item {
+    background:var(--accent-soft); border:1px dashed var(--accent);
+    color:var(--accent); font-weight:600; padding:12px;
+    cursor:pointer; font-size:15px;
+  }
+  .add-item:hover { background:#d9e7ff; }
+
+  .submit-bar {
+    position:sticky; bottom:0; margin:0 -16px -20px;
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, rgba(245,246,248,1) 70%, rgba(245,246,248,0));
+  }
+  .submit-row { display:flex; gap:8px; }
+  .submit {
+    flex:1; background:var(--accent); color:#fff; border:none;
+    font-weight:600; padding:15px; font-size:16px;
+    border-radius:10px; cursor:pointer;
+    box-shadow:0 2px 8px rgba(10,132,255,0.25);
+  }
+  .submit:disabled { background:#9cc5ff; box-shadow:none; cursor:not-allowed; }
+  .submit:active:not(:disabled) { transform:scale(0.99); }
+  .submit-process {
+    flex:1; background:#1e8e3e; color:#fff; border:none;
+    font-weight:600; padding:15px; font-size:15px;
+    border-radius:10px; cursor:pointer;
+    box-shadow:0 2px 8px rgba(30,142,62,0.25);
+  }
+  .submit-process:disabled { background:#80c49a; box-shadow:none; cursor:not-allowed; }
+  .submit-process:active:not(:disabled) { transform:scale(0.99); }
+  #bill-total {
+    display:none; text-align:right; margin:6px 0 2px;
+    padding:8px 12px; background:var(--accent-soft);
+    border-radius:8px; font-size:15px; font-weight:600;
+    color:var(--text);
+  }
+  #bill-total.incomplete { background:transparent; color:var(--muted); font-weight:500; }
+  #total-note { font-weight:500; font-size:12px; color:var(--muted); }
+
+  .hint { color:var(--muted); font-size:12px; margin-top:8px; text-align:center; }
+  kbd {
+    background:#fff; border:1px solid var(--border-strong);
+    border-bottom-width:2px; border-radius:4px;
+    padding:1px 5px; font-size:11px; font-family:inherit; color:var(--text);
+  }
+
+  .toast {
+    position:fixed; left:50%; bottom:90px; transform:translateX(-50%);
+    background:#1f2024; color:#fff; padding:12px 20px; border-radius:24px;
+    font-size:14px; font-weight:500; opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s;
+    box-shadow:0 6px 20px rgba(0,0,0,0.25);
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(-4px); }
+
+  .ac-box {
+    position:absolute; background:#fff; border:1px solid var(--border);
+    border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.12);
+    max-height:260px; overflow-y:auto; z-index:1000; display:none;
+  }
+  .ac-item { padding:11px 14px; font-size:15px; border-bottom:1px solid #f2f3f5; cursor:pointer; }
+  .ac-item:last-child { border-bottom:none; }
+  .ac-item.active, .ac-item:active { background:var(--accent-soft); color:var(--accent); }
+
+  .row-2 { display:grid; grid-template-columns:1fr 140px; gap:10px; }
+
+  /* ── Top nav tabs ── */
+  .top-nav {
+    display:flex; gap:0; margin-bottom:18px;
+    background:#e9eaec; border-radius:10px; padding:3px;
+  }
+  .top-nav button {
+    flex:1; padding:10px 8px; border:none; background:transparent;
+    color:var(--muted); font-weight:600; font-size:14px;
+    border-radius:8px; cursor:pointer; transition:all .18s;
+  }
+  .top-nav button.active {
+    background:#fff; color:var(--text);
+    box-shadow:0 1px 4px rgba(0,0,0,0.12);
+  }
+
+  /* ── Desktop online/offline banner ── */
+  .desk-status {
+    padding:9px 12px; border-radius:8px; margin-bottom:14px;
+    font-size:13px; font-weight:600; text-align:center;
+  }
+  .desk-online  { background:#e6f7ec; color:var(--success); }
+  .desk-offline { background:#fdecec; color:var(--danger); }
+  .desk-unknown { background:#f3f4f6; color:var(--muted); }
+
+  /* ── Pending list ── */
+  .pending-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:10px; padding:14px 16px; margin-bottom:10px;
+    display:flex; gap:12px; align-items:flex-start;
+  }
+  .sel-box { width:22px; height:22px; flex:0 0 auto; margin-top:2px; accent-color:var(--accent); }
+  .pending-body { flex:1; min-width:0; }
+  .pending-party {
+    font-size:16px; font-weight:700; margin:0 0 6px;
+    display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  }
+  .pending-value { color:var(--accent); white-space:nowrap; }
+  .pending-value .partial { font-size:11px; font-weight:500; color:var(--muted); }
+
+  /* Sticky bulk-process bar */
+  .bulk-bar {
+    position:sticky; bottom:0; z-index:50;
+    display:flex; align-items:center; gap:10px;
+    background:#1f2024; color:#fff; padding:12px 14px;
+    border-radius:12px; margin-top:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.25);
+  }
+  #bulk-info { flex:1; font-size:14px; font-weight:600; }
+  .bulk-bar button {
+    width:auto; padding:9px 14px; font-size:13px; font-weight:600;
+    border:none; border-radius:8px; cursor:pointer;
+  }
+  .bulk-process { background:var(--accent); color:#fff; }
+  .bulk-process:disabled { background:#9cc5ff; cursor:not-allowed; }
+  .bulk-clear { background:transparent; color:#cbd2dc; border:1px solid #3a3d44 !important; }
+
+  /* ── Printable order list (hidden on screen, shown only when printing) ── */
+  #print-area { display:none; }
+  @media print {
+    body * { visibility:hidden; }
+    #print-area, #print-area * { visibility:visible; }
+    #print-area {
+      display:block; position:absolute; left:0; top:0; width:100%;
+      padding:10px; color:#000; font-family:Arial, sans-serif;
+    }
+    #print-area h2 { font-size:20px; margin:0 0 2px; }
+    .p-date { color:#555; font-size:12px; margin-bottom:8px; }
+    .p-order { border-bottom:1px solid #bbb; padding:8px 0; page-break-inside:avoid; }
+    .p-party { font-size:17px; font-weight:bold; margin-bottom:4px; }
+    .p-sw { font-size:11px; background:#222; color:#fff; padding:1px 6px; border-radius:4px; vertical-align:middle; }
+    .p-item { display:flex; justify-content:space-between; gap:16px; font-size:15px; padding:2px 0; }
+    .p-note { font-style:italic; color:#555; font-size:13px; margin-top:3px; }
+  }
+  .pending-items { font-size:14px; color:var(--muted); line-height:1.7; margin:0 0 6px; }
+  .pending-note { font-size:13px; color:var(--accent); margin:0; }
+  .pending-meta {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:8px; font-size:12px; color:var(--muted);
+  }
+  .badge {
+    display:inline-block; padding:2px 9px; border-radius:20px;
+    font-size:11px; font-weight:600; text-transform:uppercase;
+  }
+  .badge-vyapar { background:#dbeafe; color:#1d4ed8; }
+  .badge-tally  { background:#dcfce7; color:#15803d; }
+  .badge-local  { background:#f3f4f6; color:#374151; }
+  .badge-market { background:#fef9c3; color:#854d0e; }
+  .pending-empty { text-align:center; padding:60px 16px; color:var(--muted); font-size:15px; }
+  .pending-refresh {
+    text-align:right; margin-bottom:12px;
+  }
+  .pending-refresh button {
+    background:none; border:1px solid var(--border); color:var(--muted);
+    font-size:13px; padding:7px 14px; border-radius:8px; cursor:pointer; width:auto;
+  }
+  .type-tabs {
+    display:flex; gap:0; margin-bottom:14px;
+    background:#e9eaec; border-radius:8px; padding:3px;
+  }
+  .type-tabs button {
+    flex:1; padding:8px; border:none; background:transparent;
+    color:var(--muted); font-weight:600; font-size:13px;
+    border-radius:6px; cursor:pointer; transition:all .18s;
+  }
+  .type-tabs button.active {
+    background:#fff; color:var(--text);
+    box-shadow:0 1px 3px rgba(0,0,0,0.10);
+  }
+
+  /* ── Remote "Process now" button + status ── */
+  .proc-btn {
+    margin-top:12px; background:var(--accent); color:#fff; border:none;
+    font-weight:600; padding:12px; font-size:15px; border-radius:8px; cursor:pointer;
+    box-shadow:0 2px 6px rgba(10,132,255,0.22);
+  }
+  .proc-btn:disabled { background:#9cc5ff; box-shadow:none; cursor:not-allowed; }
+  .proc-btn:active:not(:disabled) { transform:scale(0.99); }
+  .proc-status {
+    margin-top:12px; padding:11px 13px; border-radius:8px;
+    font-size:14px; font-weight:500; line-height:1.45;
+  }
+  .proc-wait { background:#fff7e6; color:#8a6d3b; }
+  .proc-ok   { background:#e6f7ec; color:var(--success); }
+  .proc-fail { background:#fdecec; color:var(--danger); }
+  .stop-btn {
+    margin-top:10px; width:100%; padding:10px; font-size:14px; font-weight:600;
+    border:1px solid var(--danger); background:#fff; color:var(--danger);
+    border-radius:8px; cursor:pointer;
+  }
+  .stop-btn:disabled { opacity:0.6; cursor:not-allowed; }
+
+  /* ── Pending card Edit / Delete buttons ── */
+  .card-actions { display:flex; gap:8px; margin-top:10px; }
+  .mini-btn {
+    flex:1; padding:9px; font-size:13px; font-weight:600; border-radius:8px;
+    border:1px solid var(--border); background:#fff; color:var(--text); cursor:pointer;
+  }
+  .mini-btn:active { transform:scale(0.99); }
+  .mini-danger { color:var(--danger); border-color:#f3c2c4; }
+
+  /* ── "Editing an order" banner on the New Order tab ── */
+  .edit-banner {
+    background:#fff7e6; color:#8a6d3b; padding:9px 12px; border-radius:8px;
+    margin-bottom:14px; font-size:13px; font-weight:600;
+  }
+  .edit-banner a { color:var(--accent); text-decoration:none; }
+
+  /* Column headers above the item list (desktop only) */
+  .item-head { display:none; }
+
+  /* Desktop: single-row items */
+  @media (min-width: 640px) {
+    .item-head {
+      display:grid;
+      grid-template-columns: 1fr 58px 64px 76px 58px 30px;
+      gap:8px; padding:0 10px 6px;
+      font-size:11px; font-weight:600; color:var(--muted);
+      text-transform:uppercase; letter-spacing:0.04em;
+    }
+    .item-head span { text-align:center; }
+    .item-head span:first-child { text-align:left; }
+    .item {
+      display:grid;
+      grid-template-columns: 1fr 58px 64px 76px 58px 30px;
+      gap:8px; align-items:center; padding:10px;
+    }
+    .item-name-row { margin-bottom:0; padding-right:0; }
+    .item-name-row label { display:none; }
+    .item-fields { display:contents; }
+    .item-fields .cell label { display:none; }
+    .del-btn { position:static; }
+
+    /* Vyapar swaps the Disc header for a Free header (same 6-column grid) */
+    body.show-free .free-head { display:block; }
+    body.show-free .disc-head { display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Orders</h1>
+
+  <div class="top-nav">
+    <button class="active" data-tab="new" onclick="switchTab('new')">New Order</button>
+    <button data-tab="pending" onclick="switchTab('pending')">Pending</button>
+    <button data-tab="past" onclick="switchTab('past')">Past Orders</button>
+  </div>
+
+  <div id="desktop-status" class="desk-status desk-unknown">Checking shop computer…</div>
+
+  <!-- ── New Order section ── -->
+  <div id="tab-new">
+
+  <div id="edit-banner" class="edit-banner" style="display:none;">
+    ✎ Editing an existing order · <a href="#" onclick="cancelEdit();return false;">Cancel</a>
+  </div>
+
+  <div class="card">
+    <div>
+      <label>Party Name</label>
+      <input id="party" placeholder="e.g. Aaiji Sales" autocomplete="off" />
+    </div>
+    <div class="row-2" style="margin-top:10px;">
+      <div>
+        <label>Software</label>
+        <select id="software">
+          <option value="vyapar">Vyapar</option>
+          <option value="tally">Tally</option>
+        </select>
+      </div>
+      <div>
+        <label>Order Type</label>
+        <select id="order_type">
+          <option value="local">Local</option>
+          <option value="market_yard">Market Yard</option>
+        </select>
+      </div>
+    </div>
+    <div id="prints-row" style="margin-top:10px;">
+      <label>Number of prints</label>
+      <select id="print_copies">
+        <option value="1">1 print</option>
+        <option value="2">2 prints</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Items</div>
+    <div class="item-head" aria-hidden="true">
+      <span>Item</span><span>Qty</span><span>Unit</span><span>Rate</span><span class="disc-head">Disc</span><span class="free-head">Free</span><span></span>
+    </div>
+    <div id="items"></div>
+    <div id="bill-total">Total: ₹<span id="total-amount">0</span><span id="total-note"></span></div>
+    <button type="button" class="add-item" onclick="addItem(true)">+ Add Item</button>
+  </div>
+
+  <div class="card">
+    <label>Notes <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+    <textarea id="notes" rows="2" placeholder="e.g. urgent, call before delivery…"
+              style="resize:vertical;font-size:15px;padding:10px 12px;"></textarea>
+  </div>
+
+  <div class="submit-bar">
+    <div class="submit-row">
+      <button id="submit" class="submit" onclick="submitOrder()">Submit Order</button>
+      <button id="submit-process" class="submit-process" onclick="submitAndProcess()">⚡ Submit &amp; Process</button>
+    </div>
+    <div class="hint">
+      <kbd>Enter</kbd> next field · <kbd>Ctrl</kbd>+<kbd>S</kbd> save
+    </div>
+  </div>
+</div><!-- end tab-new -->
+
+<!-- ── Pending Orders section ── -->
+<div id="tab-pending" style="display:none;">
+  <div class="pending-refresh">
+    <button onclick="printList()">🖨 Print list</button>
+    <button onclick="loadPending()">↺ Refresh</button>
+  </div>
+  <div class="type-tabs">
+    <button class="active" id="type-btn-local" onclick="filterType('local')">Local</button>
+    <button id="type-btn-market_yard" onclick="filterType('market_yard')">Market Yard</button>
+  </div>
+  <div id="pending-list"><div class="pending-empty">Loading…</div></div>
+
+  <div id="bulk-bar" class="bulk-bar" style="display:none;">
+    <span id="bulk-info">0 selected</span>
+    <button id="bulk-process" class="bulk-process" onclick="processSelected()">⚡ Process selected</button>
+    <button class="bulk-clear" onclick="clearSelection()">Clear</button>
+  </div>
+</div>
+
+<!-- ── Past Orders section ── -->
+<div id="tab-past" style="display:none;">
+  <div class="pending-refresh">
+    <button onclick="loadExecuted()">↺ Refresh</button>
+  </div>
+  <div id="executed-list"><div class="pending-empty">Loading…</div></div>
+</div>
+
+<div id="toast" class="toast"></div>
+<div id="print-area"></div>
+
+<script>
+// <<< CATALOG START (generated — do not edit by hand) >>>
+window.CATALOG = {"vyapar": {"parties": ["A1 Stores Nehru Chowk", "Aaiji Sales MYT", "Aakash MY", "Aamba Ent Shukrwar Peth T", "Aditya Saswad", "Ajit Gandhi Junnar", "Akshar Beauty Mandai", "Akshr Agency RP T (Oswal )", "Amba Mata Jewellers RP", "Ambika Medical RP T", "Ambika Novelty RP", "Ambika Traders Nehru Chowk", "Amruta Koregaon", "Anand Ghorpadi", "Anand Sales GP T", "Anand Store MY", "Anand Traders Lonavala", "Anandram Chandmal", "ANOKHI MY", "Ansh Traders MY", "Anup Goyal MY", "Araham Trading Co Chinchwad", "Arham Mandai T", "Arihant Agencies ABC T", "Arihant Akluj", "Arihant Beauty RPT", "Arihant General Stores Mhaswad", "Arihant MY", "Ashapura ABC", "Ashish Shah Paras Agency Satara", "Ashish Trading Company C", "Ashok Enterprise T RP", "ASOTRA : RP", "ATHARVA DISTRIBUTORS : SADASHIV PETH", "AtoZ Imitation Raviwar Peth", "ATTARWALE RP", "Avdhoot L", "Ayaan Agencies T", "B D Shinghvi MY", "B K Traders Daund", "B M Gupta Hadapsar", "Bablu Gupta Lonavala", "Babulal Gokuldas RP T", "Balaji L", "Balaji Traders T MY", "Bansal Trading MYT", "Beauty Pride RP T", "BG Goyal MY", "Bhagwan Ganesh Peth", "Bhagwati Jewellery RP T", "Bhagyalaxmi Food MY", "BHAGYALAXMI JWELLERS: TULSI BAG", "Bhairav General : Khed", "BHAIRAV SALES BHAVANI PETH T", "Bhakti Beauty T RP", "Bhalchandra Novelty Dehuroad", "Bhalgat Agency Alephata", "Bharat Beauty T RP", "Bharat Biscuit Pimpri", "Bharat Pen  Trading T", "Bharat Trading RP T", "Bhattad", "Bhavani Trading MY", "Bhavna RP", "Bhim Seth", "Bhoomi L", "Bhushan Jwellers", "Bittoo", "BK Traders Daund", "BL Malpani T RP", "Borana RP", "Cash Sale", "CH Sugandhi T", "Chacha Enterprises MY", "Chaitali Shikrapur", "Chamunda Stationers : ABC T", "Chandan Traders MY", "Chapariya Sadashiv Peth", "Charholikar Fataka", "Choudhary Marketing Chinchwad", "CM Cosmetic Sadashiv Peth", "D K Survase", "Darshan Sales MY", "Datta Pan", "Deep Hanuman Traders GP", "Deepa Traders Rajesh Poptani GP", "Deepak Traders Nana Peth", "Deepchand Khachermal Nana Peth", "DevaSheth", "Devendra Hadapsar", "Devika Nana Peth", "DHANALAXMI TRADERS : MY", "Dhananjay MY", "Dhanashree Nana Peth L", "Dhanraj Fataka", "Dilip Stores : Koregaon", "Dinesh Traders L", "DN Garde T", "Duggad Traders MY", "Durva Ent Laxmi Market T", "Future Book Centre", "Gajraj Traders Lonand", "Ganesh : ABC T", "Ganesh Agarbatti Shikrapur", "Ganesh GT", "Ganesh L", "Ganesh Sugandhalay", "Gayatri Sugandhi Mandai", "Gayatri Trading Nana Peth", "GEEKAY TRADERS L", "Geeta Sugandhalay T", "Golden Daund", "Goyal Trading MY", "Gunjan Satara", "Gupta Megha Sales Hadapsar", "H H Rathi T", "Hans Enterprises T", "Hanuman Sales GP T", "Hanuman Stores RP", "Hare Krishna RP", "Himanshu Traders C", "HINDUSTAN MY", "Hinglaj Ent : RP T", "Indrajit Aggrawal", "INDUS SALES ABC T", "JA Sugandhi L T", "Jack and Jill Opp Laxmi Market", "Jagdeep Traders MYT", "Jageshwar Trading Co RP", "JAINAM TRADERS RPT", "Jalan", "Jamdade Gandhinagar", "Jay Ambe L", "Jay Ambika Raviwar Peth", "jay Ashyapur  Nana peth", "Jay Bharat Sugandhalay T", "Jay Chowdhary L", "JayShree Imitation Raviwar Peth", "Jayshree MY", "Jinal Plastic T", "JK and sons MY", "JK Dryfuit MY", "JK Raviwar Peth", "Jogmaya GP T", "Kabir C", "Kantilal n Company Lonavala", "Kantilal Purshottam Jigar MYT", "Kateshwar RP T", "Kavita Disposables L", "Kejal My T", "Kejal Nana Peth", "Kesariya Warje", "Kewal Anand Mall T", "Kewal Beauty Centre Tulsibag", "Kewal UP Budhwar Peth T", "Kewar Enterprise", "Kiran Raddi Depo MY", "Kirti Enterprises Faltan", "Kirti Traders Baramati", "Kishor Trading Raviwar Peth T", "KK and Company MY", "Komal Jewellers RP T", "Kothari Products T", "KP Traders Daund", "Krishna Traders MY", "Krupa Jewellers T RP", "Laxmi Jewellers Nagneshi", "Laxmi Trading L", "M C Co T", "M K Pimpri", "M S SUGANDHI T", "Madhu Jewellers T", "Madhuram  Ganesh Peth", "Madhuram Enterpries MY", "MAHADEV Raviwar Peth", "Mahadev Trading MY", "Mahadwala", "Mahalaxmi Jewellers RP", "Mahalaxmi MY", "Mahalaxmi Nana Peth", "Maharani RP", "Maharashtra Bangle RP", "Maharashtra MY", "Maharashtra Narhe", "Maharashtra Sales Corp Budh T", "Mahaveer Nathuram Natepute", "MAHAVEER PATAS", "Mahavir Agencies Sadashiv Peth T", "Mahavir Agency Khed T", "Mahavir Beauty Center T", "mahavir kedagav", "Mahendra Trading Bhigwan", "Mahendra Vijay Vebhu", "Mahesh Hadapsar", "Mahesh Karwa Phaltan", "Mahesh Stationers Vaduj", "Maheshwari RP", "MAJISA RP", "Malpani Stationary House T", "Mamta Enterprises T RP", "Mamta Warje", "Mangalam Khopoli", "MARUTI SALES : AMBEGAON", "Mataji L", "Mate Pooja Bhandar T", "Mauli Sugandhalay", "MAUSAM RATHOD RP", "Mikhil Lonavala", "Mikil Lonavala", "Milind Store Natepute", "MITTAL JEWELLERS RP T", "Mittal Trading MYT", "Mohammed Akbar Gulam Dastageer", "MS Company MY", "MS Company Sunny T", "MS Sugandhi Bunty GP T", "Mukti Trade ABC", "Murlibhai Daund", "Nagalkar", "Nagneshi RP", "Nakoda Dhayari", "Nakoda Enterprises Raviwar Peth T", "NAKSHATRA VARIETY : RAVIWAR PETH", "NANDA PIMPRI", "Nanda Sales RP", "Nanda Stores", "Nandu Lohiya", "Narendra Thakkar", "Naresh Pimpri New Balaji", "Navkar Jewellers", "Navnath (Shivaji Kale) Hadapsar", "Navratna", "Neeta Nx Tulsibaug", "Neha Trading MY", "Nemaram Prajapati C", "New Bhagyalaxmi Sales MY", "New Bhavesh Traders RP T", "New Delhi Mehendi", "New Durga Foods Ganesh Peth", "New Gala Traders MYT", "New Ganpati Traders RP", "New JayShree Sales MY", "New Mahalaxmi Cosmetics T", "New Sharp Raviwar Peth T", "New Solanki Sales MY", "NK (Shashi) Market Yard", "Noor General Alauddin", "Om Agency Satara", "OM BEAUTY: TULSIBAG", "Om Khadki", "Om Trading Satara", "Osiya MY", "P R S BEAUTY BP", "Pachpute C", "Padmavati Vita", "Pancharatna Nx RP T", "Pandian", "Paneri Beauty Tulashibaga", "Pankaj Balaji L", "Pappu Solanki", "Parag Masala GP", "Parasmani Jewellers T Raviwar Peth", "Parekh Cosmetics T", "Parikh Enterprises T Kasaba Peth", "Parshv Ganesh peth", "Party 1", "Party 2", "Party 6", "Patel Ent L", "Pavankumar L", "Plastic House Akluj", "Poona Sales MYT", "Poona Trading MY", "Poonam Sugandhalay RP", "Poonam Variety RPT", "Poorvi  Traders Ganesh Peth", "Praatik Ent Kasba Peth T", "Prabha Novelties RP", "Prabhat Traders Hadapsar T", "Prabhat Traders Mehta L", "Pragati Ganesh Peth", "Prajakta Vinayak Mane Miraj", "Prakash", "Prakash Jewellers RPT", "Prakash Novelty RP", "Prakash Pharma T", "Pramod Narangaon", "Prashant Baramati", "Prathamesh Decorators MY T", "Pravin Goyal T", "Pravin L", "Pravin Mehendi", "Premier Stationary Mart T", "PREMIUM ENT LT", "Prerna Abhushan Guruwar Peth", "Prime Dist Sadashiv Peth T", "Prime Traders T", "Pritam Trading Natepute", "Priti Bangle RP", "PRS BEAUTY RP", "Puneri  Beauty Tulashibaga", "R Parikh Trading Co Kasba Peth", "Raghu C", "Rahjali Bhor", "Raj Imitation T", "Raj Nx", "Rajal File n Stationers : ABC T", "Rajan Trading Ambraj", "Rajendra Lasrune", "Rajendra Lodha Urli", "Rajendra Mahaswad", "Rajesh Stores Nana Peth", "Rajesh Traders Raviwar Peth", "Rajesh Treders MY", "Rajguru Raviwar Peth", "Rajlaxmi Hadapsar", "Rajlaxmi Sales MY T", "Rajul Trading MY", "Ram", "Ramdev ABC", "Ramdev Novelty : Tulsibag", "Ramdev Raviwar Peth", "Ramdev Traders MY", "Ramesh Darade Mundhwa C", "Rameshwar MY", "Ramkutti General Nana Peth", "Ramvilas Shrinivas", "Rana Trading L", "Rangraj RP", "Rathod Enterprises Raviwar Peth", "Rathod Ganesh Peth", "RATNATRAY AGENCY", "Ravindra Hiralal Dhobada", "Raychand Panachand Akluj", "RB Trading MY", "Rishi Jewellers", "Rohan Enterprises Sadashiv Peth T", "Rohini Book Depot T", "Rohini Sugandhalay Bandu Sarda", "Rohit Shah L", "Rohit Traders : RP T", "Rose Goti Hyd", "Roshan L", "Rupa Stationers : Baramati", "Sachin Raikar MY", "SACHIN WAI", "Sagar Enterprises: Koregaon", "SAI BOOK : ABC", "Sai Krupa Agency : MY", "Sai Samrat Pooja Bhandar Mandai", "Sai Sugandhalay", "Sainath MY", "Sainath MY T", "Salunkhe Aarti RTO", "Sampatlal Kothari", "Samta Traders MY", "Sanket Wai", "Sankla Nana Peth", "Santosh", "Santosh Rakshabandhan RP", "SANTOSH SALES MY", "Sarita Granth Bhandar RP", "Sawariya Sales : Kakade Wasti", "Shailu Indore Tradeline MY", "Shanti L", "SHANTI PERFUME RP T", "Sharad pawar Dhanori", "Sharp Enterprise RP", "Sharp GP T", "Shashi General Kakdewasti", "Shiv Traders Rajni Nana Peth", "Shivaji Kale Hadapsar", "Shivshankar RP", "Shraddha Enterprises MYT", "Shradha Enterprise Tulsibag", "Shree Bindi Tulsi Baug", "Shree Laxmi Raviwar Peth", "Shree Mahadev Dist T", "SHREE RAM L", "Shree Stationers T", "Shreeji Enterprise GB RPT", "Shreeji Marketing", "Shreeji Sales Nana Peth", "Shreepal Jewellers T RP", "Shreya Marketing Pimpri", "Shri Laxmi L", "Shri Ram Enterprise RP", "Siddhant Trading Natepute", "Siddhi Raviwar Peth", "Singhal Agency MY", "Singhal Kakdewasti", "SIRVI TRADERS L", "SK Traders MY", "Sneha Traders Raviwar Peth", "Soham Traders T", "Solanki Enterprises t", "Solanki Pappu Tempo T", "SP Kedgaon C", "SP Sales C", "Star Jewellers Tulsibaug", "STAR SUGANDHI GHODEGAON C", "Stationary Point ABC", "Subhash Agarwal narayan peth", "Subhash Seth", "Sudhir Mehta Indapur", "SUHAS AGENCY : ABC", "Suleshwari RPT", "Sundaram Ent : ABC", "Sundaram Ent MY T", "Sunil Sales T", "Supreme Lokesh Traders MY", "Supriya Warje", "Suraj Enterprises RP T", "Surbhi Bindi Spot T", "Suresh Sales Nana Peth", "Suresh Shiv Traders", "SURESH TRADERS GP", "Swamini Sales T RP", "Swastik Agency Satara", "Swatam Mhaswad", "Swati (Bafana Sales)  T", "Tamboli MY", "Tanishka L", "Taware", "TOSHIL ENTERPRISES", "Trimurti Traders ABC", "Tulsi Jew", "Uday Beauty T", "Ujjwal General Junnar", "Umesh Zanwar", "Unecha Bhugao C", "Vagad Enterprise T", "Vaibhav Pawar C", "Vaibhavlaxmi L", "Vaishnovi Distributors T", "Vandana", "Vardhaman Manik L", "Vardhaman Paras MY", "Variety Cosmetics T", "Vicky General Jeur", "Vijay Wholesale MY T", "Vijaylaxmi Hadapsar", "Vikas Padmavati Trading MY T", "Vikas Popatlal Kedgaon C", "Vinayak Novelty RP", "Vinayak Sadashiv Peth T", "Vinod Trading MY", "Vishal Khandelwal Dehu Road", "Vivan Traders MY", "Wagholikar Traders Akluj", "YASH RATHOD RP"], "items": ["Item Name", "100g Bhimsen Kapoor", "100g Kapur Pouch", "100mL Gulab Paani", "10CM GREEN", "10cm Plain", "10CM RED", "10cm Red Green", "10g Kapur Dabbi", "10g Kapur Pouch", "10Rs Bidi Bomb", "10Rs Soniya P40", "12cm Fulbhaji", "15cm Plain", "15Rs Shubhdeep Ola Dhoop", "16 Chora Taj", "1K ANIL LAD", "1k Lad", "1K MYNA LAD", "1K WATER", "2 Sound", "2 Sound Rocket", "2\" Laxmi", "2.5g Kapur Dabbi", "200g Papad", "200mL Pooja Oil", "20g Kapur Dabbi", "20g Kapur Pouch", "20Rs Soniya P30", "24 Deluxe", "240 Shot", "250 Bhimseni Kapoor", "250g Kapoor Pouch", "28 Chorsa", "28 Giant", "2k Lad", "2K POTHI LAD", "3 1/2\" Laxmi P75", "3 Shot", "3 Sound Rocket", "30 Shot", "30Cm Plain", "30Cm Red Green", "30g Dabbi", "32 Deluxe", "35rs Samarpan", "3in1 Cup Dhoop", "3in1 Ola Dhoop 25Rs", "4 Laxmi Deluxe", "4\" Laxmi P50", "400 Bharti Fulwaat", "400 Goti", "40g Kapur Pouch", "500g Bhimseni Kapoor", "500g Bhimseni Kapoor ZED BLACK", "500g Papad", "500ml Gomutra", "500ml Gulab Paani", "500ml Pooja Oil", "50cm Fulbhaji", "50g Bhimsen Kapoor", "50g Kaapur Dabbi", "5g Kapur Dabbi", "5g Kapur Pouch", "5k Lad", "5K MYNA LAD", "7 Shot Regular", "7CM GREEN", "7cm Plain", "7CM RED", "8 wala Chorsa Jawan", "Add", "Aditya Candle 10Rs P32", "Aditya Candle 2Rs P54", "Aditya Candle 5Rs P60", "AG EXCLUSIVE MIX", "AG LARGE ZB P12", "AG MADHUR VANI P6 -XL2", "AG Medium 3in1 Box P56", "AG MEDIUM MIX P56", "Ag Medium Shubhdeep Box", "AG MEDIUM VAYU BOX", "Ag NuLarge Bell3in1", "Ag NuLarge Rs55", "AG QUESS  P12", "Agarbatti", "AKHNDAWAT", "ANIL 10 KA DAM", "Anil 12 Shot RangMahal", "ANIL 25 SHOT", "Anil 2k", "Anil 3.5 Laxmi", "Anil 3pc Fancy Small", "ANIL 50 SHOT", "Anil 5k", "Anil 7 Shot", "Anil Chakra Deluxe", "Anil Chakra Special", "ANIL COLOUR PLUS", "Anil Deluxe Laxmi P25", "Anil Dynamite", "Anil Fancy 5 ka Dum", "Anil Flower Pot Small", "Anil Flower Pot Special", "ANIL HATTRICK", "ANIL HELICOPTER", "ANIL Matches", "Anil Mota Tukda", "Anil Mother Baby", "Anil Roll P80", "Anil Whistling Rocket", "Anil Whizz Wheel", "ARGON OIL", "ARPAN Cup Dhoop", "Arpan Nufamily Rs23", "Ashtagandha 1kg mix Samarpan jar P12", "Ashtagandha 250g mix Samarpan jar P48", "Ashtagandha 500g mix Samarpan jar P24", "ASHTAGANDHA DANEDAR TIKA-125G- MIX P6", "ASHTAGANDHA DANEDAR TIKA-50g P16", "ATM Matches", "Attar Dabbi", "Babelois Diaper", "Baby Rocket", "Backflow Dhoop Cone", "BAHUBALI P100", "Balaji Flora", "Balloon Matches", "Bambooless", "Bappa Morya Kapur Bharni", "Bhasm", "Bidi Bomb P48", "BRISTOL Matches", "Bronut Oil 30mL", "Bullet Bomb", "ButterFly", "Camphoor Flex 100gm Jar", "Camphoor Flex 250gm Jar", "Camphoor Flex 500gm Jar", "CAT", "Chakra Big", "Chakra Deluxe", "Chakra Special", "Chameli Tel Big ZB M30", "Chameli Tel Gandhi M30", "Chameli Tel Small P36", "Champa Matches", "Chandan Powder", "Chandan Tika Small", "Chimney Bomb", "Color Chalk P48", "Color Koti", "Color Matches", "COMFORT P100", "Cup Dhoop Jar", "Cycle Matches", "Deepak Candle 30No.", "Deepak Candle 810", "Deepak Panti Big", "Deepak Panti Small", "DHONI MIX DHOOP P14", "Dhoop Cone Jar P90", "Dhoop Cone Mix Rs 25", "Dhoop Cone Rs15", "Dhoop Pouch 15Rs P15", "Dhoop Stick Large P10", "Dhoop Stick PARFUM", "Dhoop Stick Rs15 P48", "Dstick 35Rs", "DStick Jar", "Dstick Signature Rs15 P48", "Dynamite Sutli Big", "Elois 25g Mix", "Elois 50g", "Enega Body Lotion P12", "Executive Sandal", "FATAKA PATTI", "Fifty Mix P12", "Flower Pot Ashoka", "Flower Pot Big", "Flower Pot Small", "Flower Pot Special", "Fruit Care Gel", "Fruit Care Gel 199 mrp", "Fulwaat Big", "Fulwaat Small", "GandGoli", "Ganga Jamuna", "GANGAJAL", "Ghee Diya Batti P120", "Gomutra", "Guggal Cup Dhoop", "Gulab Paani", "Gun Medium", "Gun Small", "Hamali/Packing Charges", "Helicopter", "Hemla Utna 15Rs", "Hemla Utna 20Rs", "Herbal Gel P12", "Home Likes", "Honey", "Honey Bottle", "Indra Fulbhaji", "Jaanvi Jod", "Kaapus Patti", "Kapur Daani", "Kaveri 100mL Serum", "Kaveri Cone 20GM P60", "Kaveri Cone 25GM P72", "Kaveri Cone P60", "Kaveri Creme Color M130", "KAVERI EASY FAST", "Kaveri Foam", "Kaveri Hina 10Rs", "Kaveri Nazia Fast Cone P60", "Kaveri Shampoo Base", "KHADA DHOOP", "Kids Matches", "KitKat", "KitKat Uma", "Kum Kum Roli", "Lamp Matches", "Lamsa Tea", "Laxmi Deluxe", "Laxmi Dhoop P36", "Laxmi Pooja Box", "Loban Cup Dhoop", "Loban Sticks P28", "Long Parfum P7.5", "Long Wonderful", "madh", "Magic Coal", "Mahuri Mehendi 12Rs Black P50", "Mahuri Mehendi 12Rs Brown P50", "Mahuri Mehendi 22Rs P70", "Manohar Ashtagandha", "Manthan 900g", "Manthan Dhoop Small Mix P48", "Manthan Dhwani Rs 35", "Mini Samarpan Cup P12", "Missile", "Mix Dhoop Zipper P13", "Moli", "Morpankh Dhoop", "MORPANKH FATAKA", "Mota Tukda", "Naag Goli P36", "Nail Cutter Matches", "Natural Cup Jar 30N P24", "NatureLeaf", "Naturemate Pouch 10Rs", "Naturemate Zipper 60Rs", "Naturemate Zipper Black", "Naturemate Zipper Brown", "Neeta 200g Mehendi Powder", "Neeta 4pc Cone", "Neeta 500gm Mehandi Powder", "Neeta Cone Big P48", "Neeta Cone Medium P60", "Neeta Cone Pink P60", "Neeta Cone Small P60", "New Manthan Dhoop Box P48", "Nisha 10 Mins", "Nisha 15Rs Black P80", "Nisha 15Rs Brown P80", "Nisha 15Rs Original Black", "Nisha 15Rs Original Brown", "Nisha 1ltr Developer", "Nisha 25Rs Black Box MT P24x8", "Nisha 25Rs Black P45", "Nisha 25Rs Brown P45", "Nisha 30Rs Black P45", "Nisha 30Rs Brown P45", "NISHA 5MINS", "Nisha Creme Color Box P48", "Nisha Creme Color Pouch 30Rs", "Nisha Multani Mitti", "Nisha Naturemate Creme 15Rs", "Nisha Naturemate Shampoo 15rs", "Nisha Serum 100mL", "Nisha Shampoo 650ML", "Nisha Shampoo 75ml", "Nisha Shampoo Base 20Rs", "Nisha Soap Rs55", "Nissan Ring Cap Gun Big", "Nissan Ring Cap Gun Small", "NuLarge Arpan", "Nuzipper Vayu/Samarpan", "Pan Patti Fataka", "PhotoFlash", "Platina Dhoop 25Rs", "Pooja Oil 1 L JAR20", "Pop pop", "POUCH NUMEDIUM ARPAN P75", "Praima Pen Black 24pk x 15Inner", "Praima Pen Blue 24pk x15 Inner", "Praima Pen Red 24pk x 15Inner", "Prem Dulhan 25g Henna Rs15 P40", "Prem Dulhan Cone", "Prem Dulhan Rs10 Black P70", "President Bomb", "Pul Pul JilJil", "Pulling Thread Dori Bomb P48", "Red Bijli P35", "Ring Cap", "Rocket Bomb", "Roll Cap", "Roll Cap P160", "Royal Kamal Matches", "Sada Candle 10rs P12", "Sada Candle 5rs P25", "Saddam Sutli Bomb P100", "SAKAAR", "Samarpan 1kg", "Samarpan 415g", "Samarpan Cup Dhoop", "Samarpan Kapur Pouch", "Samarpan Pouch 5Rs", "samarpan sticks", "Samaywaat Big", "Samaywaat Small", "Sambrani Cup Box Premium Mix P9", "Sambrani Dhuna", "Satyanarayan Box", "Satyanarayan Plastic", "SELFI STICK", "Selfie Stick", "Shriphal Jumbo", "Shriphal Sambrani P24", "Shubhdeep Pouch 10Rs", "Shubhdeep Pouch 5Rs", "SINGLE PIECE FANCY", "SOFT TOUCH CREME 100ML", "SOFT TOUCH CREME 15ML", "SOFT TOUCH CREME 200ML", "Sona Sikka Matches", "Soya Badi 40g Medium Coach Chunk P350", "Special  Candle 10Rs P30", "Special  Candle 5Rs P65", "Standard Whizz Wheel", "Star Rain", "Sutli Bomb Big Size", "Swami Honey", "Taka Tak Bidi Bomb P24", "Tanish 120 Shot", "Tanish 2pc Mega Fancy", "Tanish 3pc Fancy", "Tanish 3pc Fancy Big", "Tanish Aerial SkyShot", "TANISH CAPTAIN BOMB", "Tanish Dynamite", "TATA", "Tim Tim Giftpack", "TimTim Mini Pearl", "Transport charges", "TT Loban", "Tupwaat Big", "Tupwaat Small", "Urban Gabru Hair Spray", "Wastra Maal", "Wastra Maal Big", "White Chalk P48", "Wonder Throw", "YUTHIKA LIP CARE JAR P24", "Yuthika rose water", "Yutika Body Lotion 100mL", "Yutika Body Lotion 20mL", "Yutika Body Lotion 300mL", "YUTIKA BODY LOTION 500ML", "Yutika Day Creme 50gm", "Yutika Handwash Refill 10Rs", "Yutika Night Creme 50gm", "Yutika Selfcare Combo", "Yutika SPF 50 100mL", "Yutika SPF 50 30gm", "Yutika SPf 50 Creme  18gm", "Yutika SPf 50 Creme 18gm", "Yutika Tube", "Yutika Ultra Max 80ml", "Z Shine 45Rs", "ZB Ashtagandha", "ZB Bhimsen Kapur 100g", "ZB Bhimsen Kapur 10g P24", "ZB Bhimsen Kapur 25g - 16 Pkts", "ZB Bhimsen Kapur 50g", "ZB Gulabjal", "ZB HANDWASH 750 ML P8", "ZB kapoor dabbi 15g", "ZB kapoor dabbi 30g", "ZB Nu Zipper", "ZB Pouch Medium 10Rs Pouch", "ZB Zipper Medium 70Rs", "Zed Black Body Wash", "Zed Black NuFamily 23Rs Box", "Zed Black Pouch 15Rs", "Zed Black Pouch 25Rs", "Zed Black Pouch 5Rs", "Zed Klean 10Rs", "ZedBlack Candy", "ZedBlack Pooja Oil 30mL P48", "Zipper Family", "ZIPPER JUMBO", "Total"]}, "tally": {"parties": ["AAIJI SALES : MARKET YARD", "AAMBA ENTERPRISES : SHUKRAWAR PETH", "ABC STATIONERS", "ABHAY STATIONERS : KOREGAON (URD)", "Abhinanadn Jenerl URD", "ADARSH MARKET : MARKET YARD", "ADIRAJ BUILDCONE : AKLUS", "Aditya Enterprises", "ADITYA ENTERPRISES : SASWAD", "AGESHWAR TRADING CO : SHUKRAWAR PETH", "AKSHAR AGENCY-SHUKRAWAR PETH", "ALL IN ONE AGARBATTI : UCHAGAON", "AMBER PHARMA CHEM : SHUKRAWAR PETH", "AMBICA MEDICALS STORES : RAVIWAR PETH", "Amruta Trading Koregaon", "ANAND ENTERPRISES : LOHEGAON", "ANAND SALES CORPORATION : GANESH PETH", "ANAND SHANTI & CO. : BHAWANI PETH", "ANAND STORES : MARKET YARD", "ANAND STORES : NANA PETH", "ANANTLAL RATANCHAND DOSHI: SADASHIVNAGAR", "ANKUSH SALES (URD)", "ANMOL STATIONERS", "ANUJ KISHOR BHATTAD : PHALTAN", "ANUP TRADING CO :CHINCHWAD", "ARADHAYA TRADERS : DHAYARI", "Archita Nilesh Agarwal", "ARHAM ENTERPRISE : MANDAI", "ARIHANT AGENCIES_URD", "Arihant Beauty Center Raviwar Peth", "ARIHANT TRADERS YEOLA", "ARUN STATIONERS : KASTURE CHOWK", "A S Attarwala & Bros_ Mumbai", "ASHOK ENTERPRISES : SHUKRAWAR PETH", "Ashok Trading Company : Market Yard", "ASOTRA TRADING COMPANY : RAVIWAR PETH", "ATHARVA DISTRIBUTORS : SADASHIV PETH", "AVADHOOT TRADING COMPANY : GANESH  PETH", "AYAAN AGENCIES", "BABULAL GOKULDAS : PUNE", "BAFNA SALES : GANESH PETH (URD)", "BALAJI FOOD MARKET", "BALAJI MARKETING SERVICES : SOMWAR PETH", "BALAJI SALES CORPORATION : MARKET YARD", "BALAJI TRADERS : MARKET YARD", "BALAJI TRADING COMPANY MARKET YARD", "BALDOTA STATIONERS : BUDHWAR PETH", "BALKISAN DHARAMCHAND & CO : MARKET YARD", "BALKISAN LAXMINARAYAN MALPANI", "BANSAL AND COMPANY : MARKET YARD", "BANSIWALA ENTERPRISES : MARKET YARD", "B.D. SHINGVI : MARKET YARD", "BEAUTY PRIDE (URD)", "B G GOYAL AND COMPANY", "BHAGWAN GENERAL STORES : GANESH PETH", "BHAGWATI ENTERPRISES : SHUKRAWAR PETH", "Bhagwati Imitation", "BHAGYALAXMI JWELLERS : TULSIBAG URD", "BHAIRAV SALES : BHAWANI PETH", "BHAKTI BEAUTY PALACE : RAVIWAR PETH", "BHAKTI BEAUTY PALAS", "BHAKTI MARKETING : ICHALKARANJI", "Bhalgat Agencies_ALEPHATA[VIWEMHDB0286]", "BHANDARI KIRANA : NIGHOT URD)", "BHARAT BEAUITY  CENTER : RAVIWAR PETH", "BHARAT COSMETICS : RAVIWAR PETH", "Bharat Kumar Ganesh Ram", "BHARAT TRADING COMPANY : BUDHWAR PETH", "BHATARI TREDARS : KOLHAPUR URD", "BHAWANI TRADERS : SHUKRAWAR PETH", "BHAWANI TRADING CO", "BOMBAY BOOK MFG CO", "BOOKTALES : ABC", "Brandbucket Enterprises Private Limited", "BULLHULL GLOBAL INDIA PVT LTD : BUDHWAR PETH", "CENTELLA Beauty & Style", "CHACHA NARALWALE : MARKET YARD", "CHAITALI GENERAL STORES : SHIKRAPUR", "CHAMPION TRADING COMPANY : NANA PETH", "CHAMUNDA ENTERORISES", "CHAMUNDA ENTERPRISES : ABC", "CHAMUNDA STATIONERS : ABC", "CHANDALIA TRADERS : RAVIWAR PETH", "CHANDAN TRADERS : MARKET YARD", "CHANDRAKANT TRADERS: KOLHAPUR", "CHANGEDE STORES", "CHOUDHARY MARKETING : CHINCHWAD", "C H SUGANDHI & SONS : GANESH PETH", "Counter Sale-Credit", "Counter Sale-UPI Fed Bank", "DATTATARYA KAMTHE : WADKI URD", "Daywish Stationery", "DEEPAK JEWELLERS :  SHUKRAWAR PETH", "DEEPCHAND MARKET : RAMSUKH MARKET", "DELHI AGENCIES : MARKET YARD", "DELHI TRADING COMPANY: MARKET YARD", "DEVIKA TRADERS : NANA PETH", "DHALAWAT AMIT JALAMC (URD)", "DHANANJAY AND COMPANY : MARKET YARD", "DHANVARSHA BANGLES", "DILIP STORES : KOREGAON", "DINESH TRADERS : GANESH PETH", "Disha Novelty (URD)", "D N GARDE    URD", "DUGAD TRADERS : MARKET YARD", "DURVA ENTERPRISES", "ENERGETIC OVERSEAS : UNDRI", "EVEREST IT SOLUTIONS : NARAYAN PETH", "EXPO AGENCY", "Gajraj Traders Lonand", "GANDHI TRADING CO : JUNNAR", "GANESH AGENCIES : ABC", "GANRAJ KIRNA  URD", "GAURAV AGENCIES : AHMEDNAGAR", "GAURAV ENTERPRISES : PAUD", "GAURI AGENCIES : LATUR", "GEEKAY TRADERS", "GEETA ENTERPRISES BUDHWAR PETH", "GEETA SUGANDHALAYA : NANA PETH", "GOUTAM PARMAR URD", "GOVIND ENTERPRISES : SADASHIV PETH", "GOYAL ENTERPRISES : MARKET YARD", "GOYAL SALES CORPORATION : MARKET YARD", "GOYAL TRADING CO : MARKET YARD", "GURUKRUPA AGENCY : TALEGAON DABHADE", "Guruprasad Company Shirwal", "GURUPRASAD SUNGANDH BHANDAR : BUDHWAR PETH", "HANS ENTERPRISES : MARKET YARD", "Hanuman Stores", "HANUMAN TRADERS : GANESH PETH", "HANUMAN TRADERS : MARKET YARD", "HANUMAN TRADERS  (GP) : MARKET YARD", "HARDIK SUGANDHALAY : MARKET YARD", "HARI DARSHAN SALES", "HEER BEAUTI CENTER : RAVIWAR PETH", "H  H RATHI  &  SONS", "HINGLAJ ENTERPRISES", "Hitesh Bhai : Nandurbar", "INDORE TRADELINE : MARKET YARD", "INDUS SALES", "Isha Traders (URD)", "ITE SOLUTIONS", "JACK N JILL : TULSIBAG", "JAGDEEP TRADERS : MARKET YARD ( NEW )", "JAHAGIRDAR AGABATTI COMPANY : BUDHWAR PETH (URD)", "JAHAGIRDAR AGARBATTI AND PERFUMES", "JAHAGIRDAR TRADERS : BUDHWAR PETH", "JAINAM TRADERS", "JAIN NOVELTIES : RAVIWAR PETH", "JAIN STORES : SHUKRAWAR PETH", "JANATA GRAHAK MADHYAWARTI SAHKARI SANGH MARYADIT", "J A SUGANDHI : GANESH PETH", "JAYA HERBALS : BHAWANI PETH", "JAY AMBE FILE AND STATIONERS", "JAY BHARAT SUGANDHALAYA : RASTA PETH", "JAY MAHADEV ENTERPRISES : RAVIWAR PETH (URD)", "JAY RATNA JEWELLERS : RAVIWAR PETH", "JAYSHREE SALES CORPORATION : MARKET YARD", "JAYSHRI IMITATION JEWELLERY : RAVIWAR PETH (URD)", "Jay Veer Creation", "JAY VIJAY SOAP INDUSTRIES : MALSHIRAS", "JINAL PLASTIC & STATIONERY : RAVIWAR PETH", "J K DRYFRUITS : MARKET YARD", "JOGESHWARI TRADING : PUNE (URD)", "JOGMAYA ENTERPRISES", "KALPANA ENTERPRISES : HADAPSAR (URD)", "KANOSHREE PUJA BHANDAR", "KANTILAL K AND COMPNY : MARKET YARD", "KANTILAL PURUSHOTTAM & COMPANY : MARKET YARD", "KATESHWAR ENTERPRISES : RAVIWAR PETH", "KEJAL ENTERPRISES : MARKET YARD", "KETAN GENERAL STORES : SADASHIV NAGAR (URD)", "KEWAL BEAUTY CENTER TULSIBAG BP", "KEWAL COSMETIC : HVC BUDHWAR PETH", "KEWAL COSMETICS AND JEWELLERS : UP BUDHWAR PETH", "KEWAL COSMETICS & JEWELLERS: ANAND MALL", "KHEMU FRAGRANCE HUB : PISOLI", "KIANAS CREATION", "KISHAR CHANDERLAL KOTWANI (URD)", "KISHOR TRADING COMPANY : RAVIWAR PETH", "K N SURATWALA : BHUDHWAR PETH", "KOMAL JWELLERS : RAVIWAR PETH", "KOTHARI PRODUCTS", "KRISHNA Emition", "KRISHNA IMITATION JEWELLERY : R PETH", "KRISHNA VARIETIES : SHUKRAWAR PETH", "KRUPA JEWELLERS : RAVIWAR PETH", "KRUSHNA TRADERS : NANA PETH", "K.S. BEAUTY CENTRE : BUDHWAR PETH", "K TRADERS  : RAVIWAR PETH", "KUSHAL NOVELTIES", "LAVENDER HEALTHCARE PVT LTD : NEW DELHI", "LAXMANDAS GOKULDAS : RAVIWAR PETH", "LAXMI ENTERPRISES : SHUKRAWAR PETH (URD)", "LAXMI MARKET : TULSIBAUG (URD)", "LAXMI MARKETING : RASTA PETH", "LAXMI TRADING CO : GANESH PETH", "L G Gandhi : URD", "LIBERTY STORES : RAVIWAR PETH", "LOVELEENA AGENCY", "MADHU JEWELLERS", "MADHURAM ENTERPRISES : GANESH PETH", "MAHADEV AGENCY PUNE", "MAHADEV ENTERPRISES - WAKAD", "MAHADEV MARKETING : CHAKAN", "MAHADEV MARKETING & MOBILE", "MAHAKALI  STATIONERS", "MAHALAXMI JEWELLERS : RAVIWAR PETH", "MAHARASHTRA AGENCIES", "MAHARASHTRA SALES CORPORATION : BUDHWAR PETH", "MAHAVEER NATHURAM DOSHI : NATEPUTE", "MAHAVIR AGENCIES : KHED", "MAHAVIR AGENCIES : SADASHIV PETH", "MAHAVIR BEAUTY CENTER : TULSI BAUG", "MAHAVIR DISTRIBUTORS : SADASHIV PETH", "MAHAVIR KIRANA STORES", "Mahavir NX : Raviwar Peth", "MAHAVIR TRADING COMPANY : BUDHWAR PETH", "MAHEK TRADERS : SATARA", "MAHENDRA TRADING COMPANY : BHIGWAN", "MAHESH ENTERPRISE : WADAKI", "MAHESH STATIONERS : VADUJ", "MAHESH TRADERS : RAVIWAR PETH", "MAHESHWARI SAMAJ SHRI RAM MANDIR", "MAHI SUGANDHALAY : PHALTAN", "MALPANI STATIONERY HOUSE : SHUKRAWAR PETH", "MAMTA ENTERPRISES", "MANGAL SHIVPRASAD DHUT URD", "MANGESH TRADING COMPANY : KARAD", "MATE POOJA BHANDAR : BUDHWAR PETH (URD)", "MATESHWARI FANCY (URD)", "MATOSHRI AGENCIES : PANDHARPUR", "MAYOOR PEN CENTRE : BUDHWAR PETH", "M C CO. : GANESH PETH", "MEGHA SALES : HADAPSAR (URD)", "MILIND STORES : NATEPUTE", "MITTAL  JEWELLERS : SHUKRAWAR PETH", "MITTAL TRADING COMPANY : MARKET YARD", "M K Enterprises : Bhilarewadi", "MOHAMMED AKBAR GULAM DASTAGEER", "MOHINI DHOOT URD", "Morya Agency, Malegaon", "Mr Yogesh Ac", "M/S ADAKE TRADERS : SANGLI ( URD )", "MS and COMPANY MARKET YARD", "M S Company : Ganesh Peth (New)", "M S GARDE N SONS : OSMANABAD", "M/S JAYASHREE CANDAL'S", "M/s. KASTURI INDUSTRIES :", "M/S NAHAR & COMPANY", "M/S NEW BALAJI TRADERS : MARKET YARD", "M/S NUTRIFUEL PRIVATE LIMITED", "M/S. PRAMOD AGENCY : KALAMB", "M/S RAHUL AGENCIES : HYDERABAD", "M.S. SUGANDHI & CO : GANESH PETH", "M STAR MEHNDI INDUSTRIES : KARAD", "NAGALKAR SALES : PUNE (URD)", "NAGNESHI JEWELLERS : SHUKRAWAR PETH", "NAKODA ENTERPRISES : RAVIWAR PETH", "NAMOH JEWELLERS", "NARENDRA H THAKKAR N SONS : MARKET YARD (URD)", "Narsimha Enterprises_AMBEGAON.BUDRUK[VIWEMHDB0303]", "NASCENT GLOBAL IMPEX LLP : MUMBAI", "NATIKK SALES", "NATIONAL BEAUTY : SHUKRAWAR PETH", "NATIONAL  TRADERS", "NAVIN PEDHI : MARKET YARD", "NAVKAR TRADERS : URULI KANCHAN", "NEETA AGENCIES", "NEHA TRADING COMPANY : MARKET YARD", "NEMARAM PRAJAPATI", "NEMINATH SUPER MARKET : BHAWANI PETH", "NEW AAIJI TRADERS : MARKET YARD (URD)", "NEW ANISHA GOLD BEAUTY CENTER : MNG PETH (URD)", "NEW BHAVESH TRADERS : RAVIWAR PETH", "NEW GALA TRADERS : MARKET YARD", "NEW JAYSHREE SALES : MARKET YARD", "NEW MAHALAXMI COSMETICS", "NEW OMKAR JEWELLERS : RAVIWAR PETH", "NEW RAJASTHAN TRADING COMPANY : RAVIWAR PETH", "NEW SAINATH TRADING COMPANY : MARKET YARD", "NIKHIL SUBHASH NAGALKAR (URD)", "Nk Beauty Centre", "N K Enterprises", "Noor General URD", "NOVEL SEWING MACHINE : RAVIWAR PETH", "OM AGENCY : SATARA", "OM COSMETICS : TULSIBAUG (URD)", "OM SAI AGARBATTI (URD)", "OSIYA TRADING COMPANY : MARKET YARD", "PADMAVATI JEWELLERS", "PADMAVATI JEWELLERS NEW : RAVIWAR PETH", "PADMAVATI SALES AGENCY  VITA", "PADMAVATI TRADING : MARKET YARD", "PANCHARATNA TRADERS : RAVIWAR PETH", "PANKAJ AGENCY : KOLHAPUR", "PANKAJ TREADING COMPANY: NATEPUTE", "PARASMANI JEWELLERS : RAVIWAR PETH", "PAREKH COSMETICS : TULSI BAUG", "PARIKH ENTERPRISES : KASABA PETH", "PARMAR NOVELTY URD", "PARSHWANATH TRADING : (MADHU JEWELLERS)", "PARSHWANATH TRADING : RAVIWAR PETH", "PEEYU DISTRIBUTORS : SADASHIV PETH", "PIYUSH PAGARIYA : DAUND (URD)", "POOJA AGENCY : URD", "POOJA RAKSHE  URD", "POONAM VARIETIES : SHUKRAWAR PETH", "POONA SALES : MARKET YARD", "PRAATIK ENTERPRISES : KASABA PETH", "PRABHAT TRADER : HADAPSAR", "Prabhu Food Enterprises (URD)", "Prajapati", "PRAKASH BHAYYA", "PRAKASH JEWELLERS : RAVIWAR PETH", "PRAKASH PHARMACEUTICALS : SADASHIV PETH", "PRAKASH TRADING", "PRANJAL AGENCY : RADHANAGARI", "Prashant Trading Company_BARAMATI", "PRATHAMESH DECORATORS", "PRAVIN JEWELLERS", "PRAVIN TRADERS : A NAGAR", "PRAVIN TRADERS : NANA PETH", "PREMCHAND KHEMCHAND GANDHI", "PREMIER JEWLERS  URD", "PREMIER STATIONERY MART", "PREMIUM ENTERPRISES : NANA PETH", "PRIME DISTRIBUTORS : SADASHIV PETH", "PRITAM TREADING COMPANY : SOLAPUR", "PRITI SUGNDHALAY", "PUNE COSMETICS : RAVIWAR PETH", "PUNMIYA ENTERPRISES : GANESH PETH", "PURANCHAND & SONS TRADING LLP : MARKET YARD", "Radhe Krushna Enterprises_AALANDI[VIWEMHDB0313]", "RAHUL KIRANA KHANDALI", "RAJAL FILES N STATIONERS", "RAJAL STATIONERS ( CHAMUNDA )", "RAJAN TRADING COMPANY : UMBRAJ", "RAJASTHAN TRADING COMPANY : RAVIWAR PETH", "RAJDHANI ENTERPRISES", "RAJENDRA STORES : LASURNE", "RAJESH ENTERPRISES : NANA PETH", "RAJESH TRADERS: RAVIWAR PETH", "RAJ IMITATION JEWELLERY : RAVIWAR PETH", "RAJLAXMI SALES : MARKET YARD", "RAJNI STORE", "RAMKUTI GENERAL STORES : BHAWANI PETH", "RATAN AGENCIES : KALEWADI", "RATHOD ENTERPRISES : RAVIWAR PETH", "RATHOD TRADERS : RAVIWAR PETH", "RATHOR BROS : GANESH PETH URD", "Ratna Agencies_BHOR[VIWEMHDB0318]", "Ratnatray Enterprises", "RAUT BROTHERS 01", "R B TRADERS : MARKET YARD", "Riya Enterprises Karjat Raigad", "ROHAN ENTERPRISES : SADASHIV PETH (URD)", "ROHINI BOOK DEPOT AND STATIONERS", "ROHIT TRADERS : BUDHWAR PETH", "ROHIT TRADING CO : KARAD", "Rose Goti (URD)", "ROYAL ENTERPRISES", "R R DHOOT AND SONS : BUDHWAR PETH", "RUCHIT ENTERPRISES : SHUKRWAR PETH", "RUPAM ENTERPRISES : BUDHWAR PETH", "RUTUJA AGENCY : FURSUNGI", "SACHIN SAMPATLAL KOTHARI", "SACHIN TRADERS : WAI (URD)", "SADANAND JEWELLERS : SHUKRAWAR PETH", "SADEEK AGENCIES: AKLUJ URD", "S A ENTERPRISES : DHANKAWADI", "SAGAR ENTERPRISES : KOREGAON", "SAGAR MARKETING : RAJGURUNAGAR", "SAGAR VITTHAL ADHAV (URD)", "SAINATH TRADING COMPANY", "SAINEEK CANTEEN ENTERPRISES : HADAPSAR (URD)", "Sai Ram Agency_PUNE[VIWEMHDB0647]", "SAMESHA ENTERPRISES", "SAMRUDHI MEHETA :URD", "SAMTA TRADERS", "SANSKURTI JURNAL: URD", "Saraswati stationeries : ABC", "SATYAM AGENCIES : SADASHIV PETH", "SAVITA AGENCIES : SHUKRAWAR PETH", "SEEMA GENERAL STORES : DEHUROAD", "SHA GOKULDAS BULAKHIDAS : RAVIWAR PETH", "SHAHA BROTHERS : MALSHIRAS", "SHAH AGENCY", "SHA KHIMJI PREMJI & CO.", "SHANTILAL HIRACHAND CHANKESHWARA : AKLUS", "SHANTI PERFUMES & BEAUTY", "SHARDA ENTERPRISE : TULSIBAG URD", "SHARP ENTERPRISES : GANESH PETH", "SHARP ENTERPRISES : RAVIWAR PETH", "SHASHI ENTERPRISES : MARKET YARD (URD)", "SHEETAL BEAUTY CENTRE : TULSIBAUG", "Shivam Enterprises : Baner", "SHIVSHAKTI OIL DEPOT : BUDHWAR PETH", "SHIVSHANKAR TRADING CO : RAVIWAR PETH", "SHIV TRADERS", "SHRADDHA  ENTERPRISE : TULSIBAG ( URD )", "SHRADDHA ENTERPRISES New", "SHREE AMBIKA AGENCY ISLAMPUR", "SHREE ANAND SALES : TALAWADE", "Shree Dhondiraj Agency : Sandgewadi Sangli", "SHREE ENTERPRISES : BANER", "SHREE ENTERPRISES : GANESH PETH", "SHREE GANRAJ EVENT", "SHREE HANUMAN SALES : GANESH PETH", "SHREEJI AGENCY : SHUKRAWAR PETH", "SHREEJI ENTERPRISES  GB", "SHREEJI MARKETING : GANESH PETH", "Shreekrishna Novelties", "SHREE LAXMI AGENCIES SANGOLA", "SHREE MAHADEV DISTRIBUTORS", "SHREEPAL JEWELLERS : RAVIWAR PETH", "SHREE RAMDEV NOVELTY : TULSI BAUG", "SHREE SAI TRADING", "SHREE SANTOSH SALES : MARKET YARD", "SHREE STATIONERS : GANESH PETH", "Shreya Marketing Chinchwad", "SHRI BHAGYALAXMI FOOD : MARKET YARD", "SHRI HARIHAR PAPER MART : BUDHWAR PETH", "SHRI LAXMI ENTERPRISES : RAVIWAR PETH", "SHRI RAM ENTERPRISES : RAVIWAR PETH", "SHUBHAM TRADELINES : KOLHAPUR", "Siddhi Bazar, Shirala", "SIDDHI ENTERPRISES : RAVIWAR PETH", "SIDHANT TRADING COMPANY : NATEPUTE", "SIDHI BAZAR SHIRALA", "SK Enterprises Sangli", "SK KEDGAON", "SMARTPACK INDIA (RENT)", "Smita Bhosale", "SNEHA TRADERS : SHUKRAWAR PETH", "Soham Enterprises", "S OSWAL AROMA : GANESH PETH", "S OSWAL AROMA PVT  LTD", "S S BEAUTY CENTRE : SHUKRAWAR PETH", "STAR SUGANDHI", "SUDARSHAN SALES CORPORATION: BUDHWAR PETH", "SUDHIR MEHTA (URD)", "SULESHWARI THE BEAUTYS : RAVIWAR PETH", "Sundaram Enterprises", "SUNIL SALES", "Sunny Changude Baramati", "SUN  WELLNESS", "SUPREME STATIONERY : CAMP", "SUPRIM TRADERS : MARKET YARD", "SUPRIYA AGENCIES : WARJE", "SURAJ ENTERPRISES : RAVIWAR PETH", "Surbhi Bindi Spot : Tulsibag", "SURESH PUNAMCHAND BAGMAR", "SURPRISE GIFT HOUSE AND GENERAL STORES: BHANDGAON", "SUSHIL ENTERPRISES : NANA PETH", "SWAMINI SALES: RAVIWAR PETH (URD)", "SWASTIK AGENCIES : SATARA (URD)", "Swatam General Stores : Mhaswad (URD)", "SWATI TRADERS : GANESH PETH", "TAMBOLI TRADERS : KOLHAPUR URD", "TANISHKA ENTERPRISES : BIBVEWADI (URD)", "TARA TRADING : THERGAON", "THE BLOUSE COMPANY: NIBM PUNE", "T MART : PIMPARI", "TOSHIL ENTERPRISES:  SADASHIV PETH", "TULSHI BEAUTY CENTER : BUDHWAR PETH", "TULSI BEAUTY CENTRE : BUDHWAR PETH", "TULSIDAS AND COMPANY : PIMPARI", "TULSIDAS THE MALL : CHINCHWAD", "TULSI JEWELLERS : SHUKRAWAR PETH", "UDAY BEAUTY STORES : LAXMI ROAD", "UJJAWAL GENERAL STORES : JUNNAR (URD)", "U.K. STATIONERS HADAPSAR", "VAGAD ENTERPRISES", "VAIBHAVI ENTERPRISES : WADGAON SHERI (URD)", "VAISHNAV ENTERPRISES-KARVENAGAR WARJE", "VAISHNAVI SALES : VADGAONSHERI", "VAISHNOVI DISTRIBUTORS : SADASHIV PETH", "VANDANA BARDAN DEPOT : GANESH PETH", "VARDHAMAN TRADING COMPANY", "VARDHMAN TRADERS : GANESH PETH", "VARIETY COSMETICS LLP : BUDHAWAR PETH", "VIJAYDARSHAN DEPARTMENTAL STORES : AKLUS", "VIJAYS WHOLESALE : MARKET YARD", "VIKAS POPTLAL : KEDGAON (URD)", "VIMAL TRADING COMPANY", "VINAYAK DISTRIBUTOR :SADASHIV PETH", "VINOD SHINDE : HADAPSAR (URD)", "VISHAKA : KAMSHET (URD)", "VISHAL DHOOT URD", "VISHAL TRADERS : HADAPSAR", "VISHNU ELECTRIC: LATUR", "VISHNU LAXMI GENERAL STORES : DAUND", "VIVAN TRADERS", "V K AGENCIES : MUKUNDNAGAR", "VK MART : BARSHI", "V. V. Traders_Mumbai", "WRUSHABH ENTERPRISES : SADASHIV PETH", "Yash Enterprises Daund", "YASH MARKETING : GANESH PETH (URD)", "Yash Traders : Hadapsar", "ZAROORAT THE BEAUTY SHOPEE : CAMP (URD)", "ANNAPURNA TRADERS", "BHAVANI COSMETIK", "COUNTER SALE UPI HDFC", "DEEPAK TRADERS", "DHOOM DHADAKA URD", "GANESH SUGANDHALY  URD", "Govind Gattani", "JAGESHWAR TREDING COMPNY", "KARAN  SALES : SUKHSAGARNAGAR", "KRUSHNA TRADERS  PANDHARPUR", "L  T   SUPER BAZAAR", "Mahalaxmi Beauty Center NX_Hapdasar", "MAHARASHTRA   SALES", "MILONI", "MUKESH STORES  URD", "NAVHIND GENERAL STORES", "NEW  ASHAPURA  MARKETING", "OM SAIRAM  AGENCY SOLAPUR", "PANCHRATNA NX", "PATIL TRADERS BISUR", "POONAM TRADERS PIMPRI", "PRIME TRADERS : ABC", "SAMARTH SALES  SHIROL", "SHIVAJI KALE URD", "SHIVAM PRINT ARTS", "SHREE BALAJI COSMETICS", "SHREE  SIDDHI SALES AUNDH", "SHUBHAM ENTERPRISES", "SOLANKI ENTERPRISES", "TRADEXPRESS", "UTTAM AGENCIES", "VIJAY  ENTERPRISES", "Wani Enterprises_KONDHAWA", "YOGESH ENTERPRISES  URD", "Ambika Medical Stores", "Advance Tax", "Bills Receivable Ac", "Goods Ac", "Self Assesment Tax", "TCS Receivable-206H"], "items": ["10 CM ELECTRIC SPARKLERS", "10 CM RED SPARKLERS", "15 CM ELECTRIC SPARKLERS", "30 CM ELECTRIC SPARKLERS", "30 CM GREEN SPARKLERS", "3in1 Cup Dhoop P9", "5000mL PAVANRAJ FLOOR CLEANER", "500mL PAVANRAJ FLOOR CLEANER", "7 CM ELECTRIC SPARKLERS", "AG-EXCLUSIVE-MIX", "Ag-Excutive Sandal Premium P8", "Ag-ExFamily-Arpan Nufamily 25Rs", "AG FIFTY MIX P12", "Ag-Giftbox ZB 3IN1 P40", "AG JUMBO ELITE MIX P12", "AG  LARGE MIX 12", "AG MANDIR SAMARPAN P60", "Ag-Medium Mix P56", "Ag-Medium Shubhdeep Mix P48", "Ag-Medium ZB 3in1 P56", "AG-MIDUM-48-VAYU 3IN 1", "Ag-Nufamily Mix P24", "AG NULARGE", "AG NULARGE ARPAN P12.5", "AG XL2 MADHUR VANI- P6", "ANMOL GUN K-G 9", "ANMOL GUN PANTHER", "ANMOL GUN RAPID FIRE", "Ashtagandha 1kg mix Samarpan jar P12", "Ashtagandha 250g mix Samarpan jar P48", "ASHTAGANDHA-30GRAM-48SAMARPAN", "Ashtagandha 500g mix Samarpan jar P24", "Ashtagandha 60g Mix Samarpan Jar P24", "ASHTAGANDHA DANEDAR TIKA-125G- MIX P6", "ASHTAGANDHA DANEDAR TIKA-50g P16", "ASSORTED CRACKERS", "BAHUBALI Harbal Bathi Pouch", "BINDAAS POUCH", "BLA LARGE MIX", "BODY WASH - 350ML - 36P", "Bristol Safety Matches P600", "Camera Equipment", "CAMHOR 250 GRAM", "Camphoor Flex 100gm Jar", "Camphoor Flex 250gm Jar", "Camphoor Flex 500gm", "Camphoor Flex 50gm Jar", "Camphoor Morya (2.5gm) Dabbi", "Camphoor Morya 30g Dabbi", "Camphoor Morya (5gm) Dabbi", "Camphoor Morya Jar Rs.2", "Camphoor MP 100gm", "Camphoor MP 10gm", "Camphoor MP 20gm", "Camphoor MP 40gm", "Camphoor MP 5gm Pouch", "CAMPHOR 100G 24 SAMARPAN BHIMSENI", "Camphor 10g 240 Samarpan Bhimseni", "CAMPHOR 10G SAMARPAN TABLETS P1200", "Camphor 15g - 580 - Samarpan Tablets Jar", "Camphor 25g 160 Samarpan Bhimseni", "CAMPHOR 2G-16-SAMARPAN POUCH", "CAMPHOR 4G 16 SAMARPAN POUCH", "CAMPHOR 50GRAM SAMARPAN BHIMSENI", "CAMPHOR MORYA (10 GM DABI)", "CAMPHOR MORYA (30 GM ) DABI", "CAMPHOR MORYA ( 50 GM) DABI", "CAMPHOR MORYA DABI 100", "CANDLE RS 10 ADITYA P32", "Candle Rs.1 Aditya P60", "Candle Rs.5 Aditya P60", "Candy-Jar-20DIN DIN JELLY 150", "CANDY JAR 24DIN DIN PLUS150", "CANDY-JAR-24 DIN DIN STAR150", "Candy Pouch-32-Sugar Boiled Din Din Magic Mix", "CAT SLATE PENCIL", "CHAKRA DELUXE", "CHAKRA SPECIAL", "Chalk Color", "Chalk White", "Chalk White [60 Box]", "COIL-SIGMA-LARGE (12Hrs) P48", "Comphor 500g Samparpan Bhimseni Zipper", "Cone-Jar Mix P90", "CONE LARGE 8BF MIX", "Dhoop-Cone Family Mix P24", "Dhoop Cone Jar  P75", "Dhoop Dhoni Mix P14", "Dhoop Family 3in1 M25 P24", "DHOOP -MANTHAN MIDUM 48", "Dhoop-Manthan Small Mix P48", "DHOOP MIDUM MANTHAN POUCH 15", "DHOOP STICK LARGE", "DHOOP ZIPPER MIX P13", "DISHWASH SPOUT ZED KLEAN", "Dstick Jar P75", "DStick-Large-P10-Mix", "Dstick-Medium Mix P48", "Dstick-Super Mix", "Edible Oil - 30mL - Mustard Bronut Oil Bottle", "E Hand Wash-Aloevera.750ml Refill P24", "elois Hair Serum 100ml:[36 Pcs]", "Elois Hair Serum 100ml:[36 Pcs] Golden VNR", "Elois Hair Serum 100ml:[36 Pcs] Green VNR", "Elois Hair Serum 100ml:[36 Pcs] VNR", "elois Hair Serum 25ml:[36x4=144 Pcs]", "elois Hair Serum 45ml:[72 Pcs]", "Elois Hair Serum 45ml:[72 Pcs] Golden VNR", "Elois Hair Serum 45ml:[72 Pcs] Green VNR", "Elois Hair Serum 45ml:[72 Pcs] VNR", "Elois HRC-25g.Aloe Vera Extract:[12x8x4=384]", "Elois HRC-25gm.Aloevera:[12x8x4=384] KEF", "Elois HRC-25gm.Aloevera:[12x8x4=384] (MRP 60) (D22) VNR", "Elois HRC-25gm.Aloevera:[12x8x4=384] New MRP", "Elois HRC - 25 GM (KHP)", "Elois HRC-25gm.Papaya:[12x8x4=384] KEF", "Elois HRC-25gm.Papaya:[12x8x4=384] New MRP", "Elois HRC-25gm.Rose:[12x8x4=384] KEF", "Elois HRC-25gm.Rose:[12x8x4=384] New MRP", "Elois HRC-25gm.Rose:[12x8x4=384] VNR", "Elois HRC-25g.Papaya Extract:[12x8x4=384]", "Elois HRC-25g.Papaya Extract:[384] Ladi Pack", "Elois HRC-25g.Rose Essence:[12x8x4=384]", "Elois HRC-40g.Rose Essence:[384] Jar Packing", "Elois HRC-50g.Aloe Vera Extract:[288] (MRP 100) VNR", "Elois HRC-50g.Papaya Extract:[288] (MRP 100) MH 12 VNR", "Elois HRC-50g.Papaya Extract:[96]", "Elois HRC-50g.Rose Essence:[288] (MRP 100) MH 12 VNR", "Elois Sanitary Pad-Regular 240mm:[120 Pkt]", "Elois Sanitary Pad-Regular 240mm:[144 Pkt] 6 Pads", "Elois Sanitary Pad-Regular 280mm:[108 Pkt]", "Elois Sanitary Pad-Regular 280mm:[108 Pkt] 6 Pads", "Elois Sanitary Pad-Regular 280mm:[156 Pkt] 6 Pads VNR", "Elois Sanitary Pad-Regular Day Night Combo:[108 Pkt]", "Elois Sanitary Pad-Tri Fold XL 280mm:[120 Pkt]", "Elois Sanitary Pad-Tri Fold XL 280mm:[384 Pcs] Single Pad", "Elois Serum 45ml: (KEF) VNR", "Elois Serum 45ml: (KHCS) VNR", "Enega Body Lotion-20ml Almond P288", "Enega Body Lotion-20ml Aloe Vera P288", "Enega Body Lotion-300ml Almond P46", "Enega CHC-20g+20ml : Natural Black P192", "Enega CHC-60g+60ml : Dark Brown P48", "Enega CHC-60g+60ml : Honey Blonde P48", "Enega CHC-60g+60ml : Natural Black P48", "Enega CHC-60g+60ml : Natural Browng P48", "Enega Shampoo Based Hair Color NBL", "Enega Skin Cream-100ml.Aloe Moisture: [6x16=96]", "Enega Skin Cream-100ml.Honey & Almonds: [6x16=96]", "Enega Skin Cream-50ml.Aloe Moisture", "Enega Skin Cream-50ml.Skin Soft", "FLOWER POTS BIG", "FLOWER POTS COLOR KOTI", "FLOWER POTS SMALL", "FREE PREM DULHAN HAIR HENNA 25GM", "GANGA JAMUNA", "GHEE DIYABATTI JAR 10 SAMARPAN", "HANDWASH-750ML-REFILL NEEM & LEMON P16", "HERBAL Agarbatti Pouch P100", "Kaveri Balm 8 GM - 2Xtra Power (Red):[20X8=160] VNR", "Kaveri Balm 8 GM - Xtra Power (Green):[20X8=160] VNR", "Kaveri Black-10g:[10x70=700]", "Kaveri Crème Hair Color-(45gm+45 ML).Nat Black:[108]", "Kaveri Easy Fast-30.Nat. Black:[12x12=144] (Serum) VNR", "Kaveri Easy Fast-30.Nat. Black:[12x9x4=432]", "Kaveri Easy Fast-30.Nat. Black:[12x9x4=432] (D22) VNR", "Kaveri Easy Fast-30.Nat. Black:[12x9x4=432] (Serum) VNR", "Kaveri Easy Fast-30.Nat. Black:[12x9x4=432] VNR", "Kaveri Easy Fast-30.NBL.1.0:[8x40=320]", "Kaveri Easy Fast (HRC)", "Kaveri Easy Fast (Offer2)", "Kaveri Hair Color Powder-10g:[10x60=600] (Offer MH)", "Kaveri Hair Color Powder-10g.Nat. Black:[10x60=600]", "Kaveri Hair Color Powder-10g.Nat. Black:[10x60=600] VSIS", "Kaveri Hair Color Powder-10g.Nat. Black:[10x70=700]", "Kaveri Hair Color Powder-10g.Nat. Black:[10x70=700] VNR", "Kaveri Hair Color Powder-10g.Nat. Black:[10x72=720] MH 25 VNR", "Kaveri Hair Color Powder-10g.Nat. Brown:[12x20x4=960]", "Kaveri Hair Color Powder-15g.Nat. Brown:[10x60=600] VNR", "Kaveri Hair Color Powder-15g.Nat. Brown:[10x60=600] VSIS", "Kaveri Hair Color Powder-15g.Nat. Brown:[10x70=700] VNR", "Kaveri Hair Color Powder - BK [10X72=720]  (HRC) VNR", "Kaveri Hair Color Powder - BR [10X72=720]  (HRC) VNR", "Kaveri Hair Color Powder [10X60=600] KMC VNR", "Kaveri Hair Color Shampoo-(7.5+7.5 ML).Nat Black:[12x20x1=240] VNR", "Kaveri Hair Color Shampoo-(7.5+7.5 ML).Nat Black:[12x27x4=1296]", "Kaveri Hair Color Shampoo-(7.5+7.5 ML).Nat Black:[12x27x4=1296] VNR", "Kaveri Hair Color Shampoo-(7.5+7.5 ML)[12x20X1=240] (Serum) VNR", "Kaveri Mehandi Bridal Cone:[12x40=480] VNR", "Kaveri Mehandi Cone:[12x60=720] KHP VNR", "Kaveri Mehandi Cone:[12x60=720] VNR", "Kaveri Mehandi Cone:[12x60=720] (VS 96) VNR", "Kaveri Mehandi Cone:[18x40=720] SMP", "Kaveri Mehandi Cone 15 GM:[24x40=960] (VS 96) VNR", "Kaveri Mehandi Cone 20 GM:[18x40=720] VNR", "Kaveri Mehandi Cone 20 GM:[18x40=720] (VS 96) VNR", "Kaveri Mehandi Cone 25gm BR:[12x60=720]", "Kaveri Mehandi Cone-BR:[12x60=720] W/OEF", "Kaveri Mehandi Cone-BR:[12x60=720] W\s Rate Rs.66/- (Offer Pack2)", "Kaveri Mehandi Cone-BR:[12x60=720] W\s Rate Rs.66/- (Offer Pack3)", "Kaveri Mehendi Powder-1KG:[20 Pkt] {GST 5%}", "Kaveri Mehendi Powder-20KG:[1]", "Kaveri Mehendi Powder-250GM:[75 Pkt]", "Kaveri Mehendi Powder-250GM:[75 Pkt] {GST 5%}", "Kaveri Mehendi Powder-500GM:[40 Pkt] {GST 5%}", "Kids Safety Matches P300", "KUM KUM-10G-60-SAMARPAN KUM KUMROLL-POUCH", "Lamsa Tea P24", "MAGIC SOUND", "Mahuri Hair Color-Black 10g P50", "Mahuri Hair Color-Black 20g P70", "Mahuri Hair Color-Brown 12g P50", "Mahuri Hair Color-Brown 20g P70", "Mahuri Mehandi Powder", "Mehandi Cone:[12x60=720]", "Mehandi Cone:[12x60=720] BK25 VNR", "Mehandi Cone:[12x60=720] BR25 VNR", "Mehandi Cone:[12x60=720] PK25 VNR", "MOTH POLISH", "Neeta Mehandi Cone-4s P100 Brown M40", "Neeta Mehandi Cone-Black P60", "Neeta Mehandi Cone JUMBO : P48*12 M120", "Neeta Mehandi Cone Medium-25g: Black P60x12 M120", "Neeta Mehandi Cone Small:Black P60x12 M120", "NEETA MEHANDI POWDER-200G P75 M55", "NEETA MEHANDI POWDER 25G P40X10 M10", "Neeta Pro. Fashion Creme Color Kit BOX : Natural Black", "NISHA 10mins Quick HAIR CREME P36", "Nisha 55mL Serum", "Nisha Creme Color Box: Burgundy P48", "Nisha Creme Color Box: Flame Red P48", "Nisha Creme Color Box-Dark Brown P48", "Nisha Crème Color Box-Golden Blonde P48", "Nisha Crème Color Box-Honey Blonde P48", "Nisha Crème Color Box-Natural Black P48", "Nisha Crème Color Box-Natural BrownP48", "Nisha Crème Color Pouch-Burgundy P192", "Nisha Crème Color Pouch-Natural Black P192", "Nisha Crème Color Pouch-Natural Brown P192", "Nisha Fruit Care Color Gel 500ml+500: Nat Black", "Nisha Hair Color-10g Black M15 P80", "Nisha Hair Color-10g-Brown M15 P80", "NISHA HAIR COLOR 25G M30 P45 BLACK", "NISHA HAIR COLOR 25G M30 P45 BROWN", "Nisha Hair Color Powder-10g : Black M15 P70", "NISHA HAIR COLOR POWDER-10G : ORIGINAL BLACK P70", "Nisha Hair Color Powder-15g : Brown P70", "Nisha Hair Color Powder-25g : Black M25 P40", "Nisha Hair Color Powder-25g : Black P40", "Nisha Hair Color Powder-25g : Brown M25 P40", "Nisha Hair Color Powder-25g : Brown P40", "NISHA NATUREMATE SHAMPOO BASE P40", "NISHA NETERMATT 10GM BK", "NISHA NETURAMATE 25GRAM BLACK", "Nisha Neturemate-10g: Black P70x10 M10 GT", "Nisha Neturemate-10g : Original Black Trial Pack", "NISHA NETUREMATE-30G P20x6 M40", "NISHA NETUREMATE -45G ZIPPER POUCH BLACK Pcs", "NISHA NETUREMATE-45G ZIPPER POUCH BLK P40x5", "NISHA NETUREMATE BROWN", "Nisha Neturemate CremeHairColor Pouch P36", "Nisha Neturemate Zipper 45g Brown", "NISHA Pro. Developer-1000ml : 6% P12", "NISHA PRO EVER SILK HAIR SERUM 55ML ARGAN OLI GOLDE", "NISHA PRO EVER SILK HAIR SERUM 55ML PRO VITAMIN P96", "NISHA Pro Hair Serum 30mL : Argan Oil  P6x24 M70", "Nisha Pro HerbaGel 100mL P48 M199", "Nisha Pro HerbaGel 30mL P240", "Nisha Pro. Herba Gel Hair Color 500ml Original Blac", "Nisha Quick Color Ladi-10g : Natural Black P900", "NISHA QUICK COLOUR LADI 5 MINUTS", "NISHA  QUICK SHAMPOO COLOUR BOTTEL 180ML", "Nisha Quick Shampoo-Original Black P48*10 M200", "Nisha Shampoo Base Pouch 20ml", "NISHA SHAMPOO BOTTLE-650ML: P18 M399", "NISHA SHAMPOO BOTTLE-75ML P96 M49", "Non Edible Oil-500ml PD Deepak Oil Bottle P40", "PAVANRAJ AGARBATTI 250G JAR", "PAVANRAJ BALAJI FLORA 50G", "Potato Papad-200g-Coach P50", "Pouch-Family Mix P24", "Pouch-Medium Mix P25", "POUCH-NANO-SAMARPAN", "POUCH NUMEDIUM ARPAN P75 DOZ", "Pouch-Shubhdeep Small P50", "Pouch-Small Mix P40", "POUCH-SMALL-SHUBHDEEP-MIX-100", "Prem Dulhan Hair Color-10g : Black P70", "Prem Dulhan Hair Color-10g : Brown P70", "Prem Dulhan Hair Henna-125g P96", "Prem Dulhan Hair Henna-25g P30", "Prem Dulhan Hair Henna-60g P30", "Prem Dulhan Mehandi-1Kg P20", "Prem Dulhan Mehandi-500g P40", "Prem Dulhan Mehandi Cone-Black P60", "Ring Cap", "ROLL 250G", "Roll Cap", "Royal Kamal Brand Safety Matches", "Safety Matches-THEER", "Sambrani-Arpan Cup P10", "Sambrani-Box-48-Gauved-Loban", "SAMBRANI- BOX  LOBAN CUP", "SAMBRANI CUP BOX 72 GUGGAL", "Sambrani Cup Box Premium Mix P9", "SAMBRANI CUP JAR NATURAL P4", "SAMBRANI CUP NATURAL MINI P12", "SAMBRANI LARGE 10 SHRIPHAL", "Sambrani-Medium Astha P24", "SAMBRANI MEDIUM LOBAN STICKS", "Sambrani-Medium Manthan Cup P72", "Sambrani-Medium Shriphal P24", "Sambrani Medium Sticks Loban P28", "SAMBRANI NATURAL CUP JAR BIG P24", "SEV 200GM 50 RIPPS YUMMY RATLAMI", "Shriphal Pouch-HS-100g P20", "Shriphal Pouch-HS-50g P36", "Sindoor 50g-20kg Samarpan Pouch", "Soya Badi-500g Coach P40", "SS PAPAD POUCH 200GM 75 RICE COACH", "SS PAPAD POUCH 200GM-75-SABUDANA COACH", "SS PAPAD POUCH 500GM 30 RICE COACH", "SS PAPAD POUCH 80GM SABUDANA COACH", "SS POTATO PAPAD 200GM COACH P75", "STAND  MEDIUM  BACKFLOW  BURNER", "Tally Software", "Tata Slate Pencil Thin", "Tikka Chandan Large Samarpan", "TIKKA SMALL-SAMARPAN CHANDAN P24", "T NON-EDIBLE OILL 30ML-PD DEEPAK OILL BOTTEL P576", "TUTHIKA YOUTH & GLOW NIGHT CREAM 50G M249 P48", "VAKOLA  CHC 50G+50MLNATURAL BLACK", "velnik Hand Wash-3ml.Ocean Fresh:[16x90x4=5760]", "velnik Hand Wash-750ml.Ocean Fresh:[18]SPL MH", "Velnik Hand Wash-750ml.Ocean Fresh:[18] VNR", "Velnik Shampoo-6ml.(B).Black Grapes:[16x60x4=3840]", "Velnik Shampoo-6ml (KMC)", "Velnik Shampoo-6ml (KMC15)", "Velnik Shampoo-6ml (KMC20)", "Velnik Shampoo-6ml.(W).Almond Protein:[16x18x4x2=2304] Offer Pack", "Velnik Shampoo-6ml.(W).Almond Protein:[16x60x4=3840]", "Velnik Shampoo (KHP WR)", "YALI", "YUTHIKA LIP CARE JAR 5G P2x24 M149", "YUTHIKA SELFCAER REEILL 9G NEEM TULSI P40", "YUTHIKA SUNCARE SUNSCREEN CREAM 30G M115 P192", "YUTHIKA ULTRAMAX MOISTURIZING CREAM 80ML M120 P96", "YUTHIKA YOUTH & GLOW DAY CREMA 50g M249 P48", "YUTIKA ARGAN OIL-30ML P3X18 M599", "YUTIKA BODY LOTION - 40mL - P12x26", "Yutika Hand Wash Refill-180ml : Lemon P48", "Yutika Hand Wash Refill-180ml : Lemon P72", "Yutika Hand Wash Refill-750ml : Lemon P18", "Yutika Hand Wash Refill-750ml : Neem P12", "Yutika Hand Wash Refill-750ml : Neem P18", "YUTIKA NATURE LEAF 30GRAM P168", "YUTIKA PRO BLONDER POWDER BOX  60GRAM", "YUTIKA PRO CREME COLOR 100G", "YUTIKA PRO -DEVELOPER 1000 ML", "YUTIKA PRO DEVELOPER 500ML", "Yutika SoftTouch Body Lotion-100ml Almond P96 M70", "Yutika SoftTouch Body Lotion 100ml AloeVera P96 M70", "YUTIKA SoftTouch Body Lotion-20ml : Almond P12x24 M10", "YUTIKA SoftTouch Body Lotion-20ml : Aloev  P12x24 M10", "YUTIKA SoftTouch Body Lotion-300ml : Almond P36 M175", "YUTIKA SoftTouch Body Lotion-500ml : Almond P24 M255", "YUTIKA SoftTouch Body Lotion-500ml : AloeVera P24 M255", "YUTIKA SoftTouch CREAM 15ML P12X24 M10", "YUTIKA SoftTouch CREAM 25mL P12x24", "YUTIKA SOFT TOUCH  LIP CARRE 10 GRAM JAR", "YUTIKA SunCare Sunscreen Lotion-100ml P96 M120", "Yutika Sunscreen SPF50 18G P288", "ZB 50mL CHAMELI OIL", "ZB CHAMELI OIL 20ML P36", "ZB EDIBLE OIL 500ML P40 MUSTARD BRONUT", "ZB GULAB JAL 20ML P36", "ZB SAMARPAN 30G KAPUR DABBI P38", "ZED KLEAN DISHWASH 125g 10RS P240", "ZED KLEAN DISHWASH 60g 5Rs P210", "ZIPPER FAMILY 50 SAMARPAN", "Zipper-Family Mix P48", "Zipper-JUMBO - Mix P12", "Zipper-Manthan 1000 Mega P20", "Zipper Medium Mix P12", "ZIPPER NUMEDIUM", "Zipper Super Arpan Mix - P12", "Z SHINE 75G P320", "Z SHINE POWDER 200G P120", "Mix Dhoop", "Nisha 15 Wala Black 80pkt", "Nisha 15 Wala Brown 80pkt", "Nisha 30 Wala Black", "Nisha 30 Wala Brown"]}};
+// <<< CATALOG END >>>
+</script>
+
+<script>
+const SUPABASE_URL = "https://hcvsxohxjargzoffhgkl.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjdnN4b2h4amFyZ3pvZmZoZ2tsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMjEwMjcsImV4cCI6MjA5MTU5NzAyN30.0I9d6G4tTCmzFWXTcWBMGlZrp7uMODWJhslif2GeZAc";
+const TABLE = "pending_orders";
+const LP_TABLE = "party_last_prices";
+
+function currentSoftware() { return document.getElementById("software").value; }
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+// ─── Autocomplete ──────────────────────────────────────────
+// Normalize: lowercase + drop everything that isn't a letter/digit.
+// So "Ag Medium", "Ag-Medium", "ag  medium", "AG:MEDIUM" all match.
+function norm(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, ""); }
+
+function filterCatalog(list, query, limit = 10) {
+  const qn = norm(query);
+  if (!qn) return [];
+  const starts = [], contains = [];
+  for (const s of list) {
+    const sn = norm(s);
+    const words = s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    if (sn.startsWith(qn) || words.some(w => w.startsWith(qn))) starts.push(s);
+    else if (sn.includes(qn)) contains.push(s);
+    if (starts.length >= limit) break;
+  }
+  return starts.concat(contains).slice(0, limit);
+}
+
+function attachAutocomplete(input, kind, onSelect) {
+  const box = document.createElement("div");
+  box.className = "ac-box";
+  document.body.appendChild(box);
+
+  let shown = [], active = -1;
+
+  function position() {
+    const r = input.getBoundingClientRect();
+    box.style.left = (r.left + window.scrollX) + "px";
+    box.style.top  = (r.bottom + window.scrollY + 2) + "px";
+    box.style.width = r.width + "px";
+  }
+  function render() {
+    const list = (window.CATALOG[currentSoftware()] || {})[kind] || [];
+    shown = filterCatalog(list, input.value);
+    if (!shown.length) { hide(); return; }
+    active = -1;
+    box.innerHTML = shown.map((m, i) =>
+      `<div class="ac-item" data-i="${i}">${escapeHtml(m)}</div>`
+    ).join("");
+    position();
+    box.style.display = "block";
+  }
+  function hide() { box.style.display = "none"; shown = []; active = -1; }
+  input._acHide = hide;
+  input._acIsOpen = () => box.style.display === "block";
+  input._acTakeActive = () => {
+    if (active >= 0 && active < shown.length) {
+      input.value = shown[active]; hide(); return true;
+    }
+    return false;
+  };
+
+  box.addEventListener("mousedown", (e) => {
+    const el = e.target.closest(".ac-item");
+    if (!el) return;
+    e.preventDefault();
+    input.value = shown[+el.dataset.i];
+    hide();
+    input.focus();
+    if (onSelect) onSelect(input.value);
+  });
+  input.addEventListener("input", render);
+  input.addEventListener("focus", render);
+  input.addEventListener("blur", () => setTimeout(hide, 150));
+  input.addEventListener("keydown", (e) => {
+    if (box.style.display !== "block") return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      active = (active + (e.key === "ArrowDown" ? 1 : -1) + shown.length) % shown.length;
+      [...box.children].forEach((c, i) => c.classList.toggle("active", i === active));
+    } else if (e.key === "Enter" && active >= 0) {
+      e.preventDefault();
+      input.value = shown[active];
+      hide();
+      if (onSelect) onSelect(input.value);
+    } else if (e.key === "Escape") {
+      hide();
+    }
+  });
+  window.addEventListener("scroll", () => { if (box.style.display === "block") position(); }, true);
+  window.addEventListener("resize", () => { if (box.style.display === "block") position(); });
+}
+
+// ─── Keyboard navigation ──────────────────────────────────
+function nextInputFrom(el) {
+  if (el.id === "party") {
+    return document.querySelector("#items .item .i-name");
+  }
+  const row = el.closest(".item");
+  if (!row) return null;
+  const order = [".i-name", ".i-qty", ".i-unit", ".i-rate", ".i-disc", ".i-free"];
+  const cls = order.find(c => el.classList.contains(c.slice(1)));
+  const idx = order.indexOf(cls);
+  // advance to the next *visible* field in this row (skips hidden Disc/Free)
+  for (let j = idx + 1; j < order.length; j++) {
+    const cand = row.querySelector(order[j]);
+    if (cand && cand.offsetParent !== null) return cand;
+  }
+  const allRows = [...document.querySelectorAll("#items .item")];
+  const rowIdx = allRows.indexOf(row);
+  if (rowIdx >= 0 && rowIdx < allRows.length - 1) {
+    return allRows[rowIdx + 1].querySelector(".i-name");
+  }
+  addItem(true);
+  return document.querySelector("#items .item:last-child .i-name");
+}
+
+function onEnterAdvance(e) {
+  if (e.key !== "Enter") return;
+  const el = e.target;
+  if (el._acIsOpen && el._acIsOpen() && el._acTakeActive && el._acTakeActive()) {
+    e.preventDefault();
+    return;
+  }
+  if (el._acHide) el._acHide();
+  const nxt = nextInputFrom(el);
+  if (nxt) {
+    e.preventDefault();
+    nxt.focus();
+    nxt.select && nxt.select();
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    submitOrder();
+  }
+});
+
+// ─── Item rows ────────────────────────────────────────────
+// ── Party last-price lookup ───────────────────────────────
+let _lastPrices = {};   // {item_name_lower: {rate, unit}}
+
+async function fetchLastPrices(partyName) {
+  _lastPrices = {};
+  if (!partyName) return;
+  try {
+    const sw = currentSoftware();
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${LP_TABLE}?party_name=eq.${encodeURIComponent(partyName)}&software=eq.${sw}&select=item_name,rate,unit`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) return;
+    const rows = await res.json();
+    rows.forEach(r => { _lastPrices[r.item_name.toLowerCase()] = { rate: r.rate, unit: r.unit }; });
+  } catch (_) {}
+}
+
+function applyLastPrice(nameInput, rateInput, unitInput) {
+  const key = nameInput.value.trim().toLowerCase();
+  if (!key) return;
+  let match = _lastPrices[key];
+  if (!match) {
+    const k8 = key.slice(0, 8);
+    for (const [k, v] of Object.entries(_lastPrices)) {
+      if (k.startsWith(k8) || k8.startsWith(k.slice(0, 8))) { match = v; break; }
+    }
+  }
+  if (!match) return;
+  if (!rateInput.value.trim()) rateInput.value = match.rate;
+  if (!unitInput.value.trim() && match.unit) unitInput.value = match.unit;
+}
+
+function addItem(focusIt) {
+  const row = document.createElement("div");
+  row.className = "item";
+  row.innerHTML = `
+    <div class="item-name-row cell">
+      <label>Item</label>
+      <input class="i-name" placeholder="Item name" autocomplete="off" />
+    </div>
+    <div class="item-fields">
+      <div class="cell"><label>Qty</label>  <input class="i-qty"  placeholder="1" inputmode="decimal" /></div>
+      <div class="cell"><label>Unit</label> <input class="i-unit" placeholder="pcs" /></div>
+      <div class="cell"><label>Rate</label> <input class="i-rate" placeholder="0" inputmode="decimal" /></div>
+      <div class="cell disc-cell"><label>Disc</label> <input class="i-disc" placeholder="0" inputmode="decimal" /></div>
+      <div class="cell free-cell"><label>Free</label> <input class="i-free" placeholder="0" inputmode="decimal" /></div>
+    </div>
+    <button type="button" class="del-btn" title="Remove"
+            onclick="this.closest('.item').remove(); updateTotal()">×</button>
+  `;
+  document.getElementById("items").appendChild(row);
+  const nameEl = row.querySelector(".i-name");
+  const rateEl = row.querySelector(".i-rate");
+  const unitEl = row.querySelector(".i-unit");
+  // on_select: fill immediately when item chosen from dropdown
+  attachAutocomplete(nameEl, "items", () => setTimeout(() => {
+    applyLastPrice(nameEl, rateEl, unitEl);
+    updateTotal();
+  }, 50));
+  row.querySelectorAll("input").forEach(i => i.addEventListener("keydown", onEnterAdvance));
+  // Update running total whenever qty or rate changes
+  row.querySelector(".i-qty").addEventListener("input", updateTotal);
+  rateEl.addEventListener("input", updateTotal);
+  row.querySelector(".i-disc")?.addEventListener("input", updateTotal);
+  // blur: secondary trigger if user types name manually
+  nameEl.addEventListener("blur", () => setTimeout(() => applyLastPrice(nameEl, rateEl, unitEl), 120));
+  if (focusIt) nameEl.focus();
+}
+
+(function init() {
+  const party = document.getElementById("party");
+  // onSelect: fetch immediately when party chosen from dropdown
+  attachAutocomplete(party, "parties", (v) => fetchLastPrices(v));
+  party.addEventListener("keydown", onEnterAdvance);
+  // blur: secondary trigger if user types party name manually
+  party.addEventListener("blur", () => {
+    const name = party.value.trim();
+    if (name) fetchLastPrices(name);
+  });
+  addItem(false);
+  document.getElementById("software").addEventListener("change", applySoftwareUI);
+  document.getElementById("order_type").addEventListener("change", applyOrderTypeUI);
+  applySoftwareUI();
+  checkDesktopStatus();
+  setInterval(checkDesktopStatus, 25000);   // re-check every 25s
+})();
+
+// Show the Free-quantity column only when Vyapar is selected
+function applySoftwareUI() {
+  const isVyapar = currentSoftware() === "vyapar";
+  document.body.classList.toggle("show-free", isVyapar);
+  applyOrderTypeUI();   // keep print copies in sync when software changes
+}
+
+// Auto-set print copies to 2 when Market Yard + Vyapar are both selected.
+function applyOrderTypeUI() {
+  const isMY      = document.getElementById("order_type").value === "market_yard";
+  const isVyapar  = currentSoftware() === "vyapar";
+  document.getElementById("print_copies").value = (isVyapar && isMY) ? "2" : "1";
+}
+
+// Live bill total — sum of qty × rate across all item rows
+function updateTotal() {
+  // Always show the running bill total prominently as soon as there's any value
+  // (qty × rate). If some items still lack a rate, keep the total visible and
+  // add a small note so the operator knows it isn't final yet.
+  let total = 0, missing = 0, named = 0;
+  document.querySelectorAll("#items .item").forEach(r => {
+    const name = r.querySelector(".i-name").value.trim();
+    if (!name) return;                       // ignore blank/trailing rows
+    named++;
+    const qty  = parseFloat(r.querySelector(".i-qty").value)  || 0;
+    const rate = parseFloat(r.querySelector(".i-rate").value) || 0;
+    const disc = parseFloat(r.querySelector(".i-disc")?.value) || 0;
+    if (rate > 0) total += qty * rate * (1 - disc / 100);
+    else missing++;
+  });
+
+  const el   = document.getElementById("bill-total");
+  const span = document.getElementById("total-amount");
+  const note = document.getElementById("total-note");
+
+  if (total <= 0) { el.style.display = "none"; return; }
+  el.style.display = "block";                 // explicit — "" would fall back to CSS display:none
+  el.classList.remove("incomplete");         // keep it prominent, always
+  span.textContent = total.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  note.textContent = missing > 0
+    ? `  · ${missing} item${missing > 1 ? "s" : ""} without rate`
+    : "";
+}
+
+// ─── Desktop online indicator (reads the worker's heartbeat) ──
+const HB_TABLE = "app_heartbeat";
+const HB_FRESH_MS = 90000;   // online if the desktop beat within the last 90s
+
+async function checkDesktopStatus() {
+  const el = document.getElementById('desktop-status');
+  if (!el) return;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${HB_TABLE}?name=eq.desktop&select=last_seen`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+    const rows = await res.json();
+    const lastSeen = rows.length ? rows[0].last_seen : null;
+    if (lastSeen && (Date.now() - new Date(lastSeen).getTime()) < HB_FRESH_MS) {
+      el.className = 'desk-status desk-online';
+      el.textContent = '🟢 Shop computer online — orders can be processed now';
+    } else {
+      el.className = 'desk-status desk-offline';
+      el.textContent = '🔴 Shop computer offline — orders will queue until it’s back';
+    }
+  } catch (e) {
+    el.className = 'desk-status desk-unknown';
+    el.textContent = '⚪ Couldn’t check shop computer status';
+  }
+}
+
+// ─── Toast + submit ───────────────────────────────────────
+function toast(msg, ok=true) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.background = ok ? "#1e8e3e" : "#c2373b";
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+function collect() {
+  const party = document.getElementById("party").value.trim();
+  if (!party) throw new Error("Enter party name");
+  const software = currentSoftware();
+  const rows = document.querySelectorAll("#items .item");
+  const items = [];
+  rows.forEach(r => {
+    const name = r.querySelector(".i-name").value.trim();
+    if (!name) return;
+    const it = {
+      name,
+      qty:  r.querySelector(".i-qty").value.trim() || "1",
+      unit: r.querySelector(".i-unit").value.trim(),
+      rate: r.querySelector(".i-rate").value.trim(),
+    };
+    if (software === "vyapar") {
+      // Vyapar: free quantity, no discount
+      it.disc = "0";
+      it.free = r.querySelector(".i-free").value.trim() || "0";
+    } else {
+      // Tally: discount, no free quantity
+      it.disc = r.querySelector(".i-disc").value.trim() || "0";
+    }
+    items.push(it);
+  });
+  if (items.length === 0) throw new Error("Add at least one item");
+  const order_type = document.getElementById("order_type").value;
+  const notes = document.getElementById("notes").value.trim();
+  // Number of prints (Vyapar only; harmless default of 1 otherwise)
+  const print_copies = software === "vyapar"
+    ? (parseInt(document.getElementById("print_copies").value, 10) || 1) : 1;
+  return { party_name: party, software, order_type, items, notes, print_copies, source: "mobile" };
+}
+
+// Core submit logic. Returns the new order's id (string) on success,
+// or null for edits/failures. Manages the Submit button state.
+async function _doSubmit() {
+  const btn = document.getElementById("submit");
+  let body;
+  try { body = collect(); }
+  catch (e) { toast(e.message, false); return null; }
+  const editing = _editingId;
+  btn.disabled = true;
+  btn.textContent = editing ? "Updating…" : "Submitting…";
+  try {
+    const headers = {
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+      // Return representation for new orders so we get the generated id back
+      "Prefer": editing ? "return=minimal" : "return=representation",
+    };
+    let res;
+    if (editing) {
+      res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${editing}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          party_name: body.party_name, software: body.software,
+          order_type: body.order_type, items: body.items,
+          notes: body.notes, print_copies: body.print_copies,
+          status: "pending", result_message: "",
+        }),
+      });
+    } else {
+      res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+        method: "POST", headers, body: JSON.stringify(body),
+      });
+    }
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`HTTP ${res.status}: ${t}`);
+    }
+    if (editing) {
+      toast("Order updated ✓");
+      cancelEdit();
+      switchTab("pending");
+      return null;
+    } else {
+      const rows = await res.json();
+      const newId = rows[0]?.id ?? null;
+      toast("Order sent ✓");
+      document.getElementById("party").value = "";
+      document.getElementById("notes").value = "";
+      applyOrderTypeUI();
+      document.getElementById("items").innerHTML = "";
+      addItem(true);
+      updateTotal();
+      return newId;
+    }
+  } catch (e) {
+    toast("Failed: " + e.message, false);
+    return null;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = _editingId ? "Update Order" : "Submit Order";
+  }
+}
+
+async function submitOrder() {
+  await _doSubmit();
+}
+
+// Submit the order AND immediately send it to the desktop for processing.
+async function submitAndProcess() {
+  // Confirm before firing a real bill on the shop computer. Show a summary so
+  // the operator knows exactly what's about to be created and printed.
+  const party = document.getElementById("party").value.trim();
+  const itemCount = [...document.querySelectorAll("#items .item")]
+      .filter(r => r.querySelector(".i-name").value.trim()).length;
+  const totalTxt = document.getElementById("total-amount").textContent;
+  const summary =
+      "Submit and process this order on the shop computer now?\n\n" +
+      `Party: ${party || "(none)"}\n` +
+      `Items: ${itemCount}\n` +
+      `Total: ₹${totalTxt}\n\n` +
+      "This will create and print the bill immediately.";
+  if (!confirm(summary)) return;
+
+  const procBtn = document.getElementById("submit-process");
+  procBtn.disabled = true;
+  procBtn.textContent = "Submitting…";
+  try {
+    const id = await _doSubmit();
+    if (!id) return;                       // edit or failure — nothing to process
+    // Switch to Pending, wait for the card to appear, then kick off processing
+    switchTab("pending");
+    await loadPending();
+    clearInterval(_pendingPollTimer); _pendingPollTimer = null;
+    const card = document.querySelector(`.pending-card[data-id="${id}"]`);
+    await awaitProcess(id, card);
+    setTimeout(resumePending, 2500);
+  } finally {
+    procBtn.disabled = false;
+    procBtn.textContent = "⚡ Submit & Process";
+  }
+}
+
+// ── Tab navigation ──────────────────────────────────────
+let _pendingPollTimer = null;
+let _allPendingOrders = [];
+let _activeType = 'local';
+
+function switchTab(tab) {
+  document.getElementById('tab-new').style.display     = tab === 'new'     ? '' : 'none';
+  document.getElementById('tab-pending').style.display = tab === 'pending' ? '' : 'none';
+  document.getElementById('tab-past').style.display    = tab === 'past'    ? '' : 'none';
+  document.querySelectorAll('.top-nav button').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  if (tab === 'pending') {
+    loadPending();
+    if (!_pendingPollTimer)
+      _pendingPollTimer = setInterval(loadPending, 30000);
+  } else {
+    clearInterval(_pendingPollTimer);
+    _pendingPollTimer = null;
+  }
+  if (tab === 'past') loadExecuted();
+}
+
+function filterType(type) {
+  _activeType = type;
+  document.querySelectorAll('.type-tabs button').forEach(b => b.classList.remove('active'));
+  document.getElementById('type-btn-' + type).classList.add('active');
+  renderPending();
+}
+
+async function loadPending() {
+  try {
+    // Include in-progress orders so that if the page was closed while an order
+    // was being processed, we can auto-resume watching it when the page reopens.
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(pending,process_requested,processing,failed)&select=*&order=created_at.asc`,
+      { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    _allPendingOrders = await res.json();
+    renderPending();
+  } catch (e) {
+    document.getElementById('pending-list').innerHTML =
+      `<div class="pending-empty">⚠ ${e.message}</div>`;
+  }
+}
+
+// Sum qty × rate across an order's items. Returns the total and how many
+// items have no rate yet (so the card can flag a partial total).
+function orderValue(items) {
+  let total = 0, missing = 0;
+  (items || []).forEach(it => {
+    const qty  = parseFloat(it.qty)  || 0;
+    const rate = parseFloat(it.rate) || 0;
+    if (rate > 0) total += qty * rate; else missing++;
+  });
+  return { total, missing };
+}
+
+function renderPending() {
+  const list = _allPendingOrders.filter(o => (o.order_type || 'local') === _activeType);
+  const el = document.getElementById('pending-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="pending-empty">No pending orders here ✓</div>';
+    return;
+  }
+  el.innerHTML = list.map(o => {
+    const itemLines = (o.items || [])
+      .map(it => {
+        const freeTxt = (it.free && String(it.free) !== '0')
+          ? ` <span style="color:var(--success)">(+${escapeHtml(String(it.free))} free)</span>` : '';
+        const unitTxt = it.unit ? ' ' + escapeHtml(it.unit) : '';
+        return `${escapeHtml(it.name)} × ${escapeHtml(String(it.qty))}${unitTxt}${freeTxt}`;
+      })
+      .join('<br>');
+    const noteHtml = o.notes
+      ? `<p class="pending-note">📝 ${escapeHtml(o.notes)}</p>` : '';
+    const swBadge = `<span class="badge badge-${o.software}">${o.software.toUpperCase()}</span>`;
+    const typeBadge = o.order_type === 'market_yard'
+      ? `<span class="badge badge-market">Market Yard</span>`
+      : `<span class="badge badge-local">Local</span>`;
+    const ts = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    const ov = orderValue(o.items);
+    const valueHtml = ov.total > 0
+      ? `<span class="pending-value">₹${ov.total.toLocaleString('en-IN', {maximumFractionDigits: 2})}`
+        + `${ov.missing ? ' <span class="partial">(partial)</span>' : ''}</span>`
+      : '';
+    const checked = _selectedIds.has(String(o.id)) ? 'checked' : '';
+    // Disable Process button for orders that are already in-flight
+    const inFlight = ['process_requested','processing'].includes(o.status);
+    const failed   = o.status === 'failed';
+    const procBtnHtml = inFlight
+      ? `<button class="proc-btn" disabled>⚙ Processing…</button>`
+      : failed
+        ? `<button class="proc-btn" style="background:#C9582E"
+                   onclick="retryOrder('${o.id}', this)">↻ Retry</button>`
+        : `<button class="proc-btn" onclick="processOrder('${o.id}', this)">⚡ Process now</button>`;
+    // Show the failure reason so the operator knows WHY it didn't process.
+    const failHtml = (failed && o.result_message)
+      ? `<p class="pending-note" style="color:#E0556B;background:#3a1f24">✗ ${escapeHtml(o.result_message)}</p>`
+      : '';
+    return `<div class="pending-card" data-id="${o.id}">
+      <input type="checkbox" class="sel-box" ${checked}
+             title="Select for bulk processing"
+             onchange="toggleSelect('${o.id}', this)">
+      <div class="pending-body">
+        <p class="pending-party"><span>${escapeHtml(o.party_name)}</span>${valueHtml}</p>
+        <p class="pending-items">${itemLines}</p>
+        ${noteHtml}
+        ${failHtml}
+        <div class="pending-meta">${swBadge} ${typeBadge} <span>${ts}</span></div>
+        <div class="card-actions">
+          <button class="mini-btn" onclick="editOrder('${o.id}')">✎ Edit</button>
+          <button class="mini-btn mini-danger" onclick="deleteOrder('${o.id}', this)">🗑 Delete</button>
+        </div>
+        ${procBtnHtml}
+      </div>
+    </div>`;
+  }).join('');
+  updateBulkBar();
+
+  // Auto-resume watching any orders that were in-flight when the page closed.
+  // awaitProcess with skipRequest=true just polls — it won't re-PATCH the status.
+  list
+    .filter(o => ['process_requested','processing'].includes(o.status))
+    .forEach(o => {
+      const card = document.querySelector(`.pending-card[data-id="${o.id}"]`);
+      if (card && !card._watching) {
+        card._watching = true;
+        clearInterval(_pendingPollTimer); _pendingPollTimer = null;
+        awaitProcess(o.id, card, /*skipRequest=*/true)
+          .then(() => setTimeout(resumePending, 2500));
+      }
+    });
+}
+
+let _editingId = null;
+
+function editOrder(id) {
+  const o = _allPendingOrders.find(x => String(x.id) === String(id));
+  if (!o) return;
+  _editingId = id;
+  document.getElementById('party').value        = o.party_name || '';
+  document.getElementById('software').value     = o.software || 'vyapar';
+  document.getElementById('order_type').value   = o.order_type || 'local';
+  document.getElementById('notes').value        = o.notes || '';
+  document.getElementById('print_copies').value = String(o.print_copies || 1);
+  applySoftwareUI();
+
+  const itemsEl = document.getElementById('items');
+  itemsEl.innerHTML = '';
+  (o.items || []).forEach(it => {
+    addItem(false);
+    const row = itemsEl.lastElementChild;
+    row.querySelector('.i-name').value = it.name || '';
+    row.querySelector('.i-qty').value  = (it.qty  ?? '');
+    row.querySelector('.i-unit').value = it.unit || '';
+    row.querySelector('.i-rate').value = (it.rate ?? '');
+    row.querySelector('.i-disc').value = (it.disc ?? '');
+    const f = row.querySelector('.i-free');
+    if (f) f.value = (it.free ?? '');
+  });
+  if (!(o.items || []).length) addItem(false);
+
+  document.getElementById('edit-banner').style.display = '';
+  document.getElementById('submit').textContent = 'Update Order';
+  switchTab('new');
+  window.scrollTo(0, 0);
+}
+
+function cancelEdit() {
+  _editingId = null;
+  document.getElementById('edit-banner').style.display = 'none';
+  document.getElementById('submit').textContent = 'Submit Order';
+  document.getElementById('party').value = '';
+  document.getElementById('notes').value = '';
+  applyOrderTypeUI();
+  document.getElementById('items').innerHTML = '';
+  addItem(false);
+  updateTotal();
+}
+
+async function deleteOrder(id, btn) {
+  if (!confirm('Delete this pending order? This cannot be undone.')) return;
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    _allPendingOrders = _allPendingOrders.filter(o => String(o.id) !== String(id));
+    renderPending();
+    toast('Order deleted ✓');
+  } catch (e) {
+    toast('Delete failed: ' + e.message, false);
+    btn.disabled = false;
+    btn.textContent = '🗑 Delete';
+  }
+}
+
+// ── Remote processing: ask the desktop app to bill this order ──
+const PROCESS_POLL_MS = 4000;
+const PROCESS_TIMEOUT_MS = 120000;   // 2 min before we give up waiting
+
+const _cancelled = new Set();   // order ids the user asked to stop (and we reverted)
+let _bulkStop = false;          // set when the user stops a bulk run
+let _bulkCurrentId = null;      // the order currently being processed in a bulk run
+
+// Core: flag one order for the desktop and wait until it finishes.
+// Resolves true on success, false on failure/timeout.
+// skipRequest=true — skips the initial PATCH (use when the order is already in-flight,
+//   e.g. the page was closed and reopened while processing was underway).
+function awaitProcess(id, card, skipRequest = false) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+
+    const poll = async () => {
+      if (_cancelled.has(String(id))) {              // user stopped it
+        _cancelled.delete(String(id));
+        setCardStatus(card, 'fail', '■ Stopped — moved back to pending.');
+        return resolve(false);
+      }
+      if (Date.now() - started > PROCESS_TIMEOUT_MS) {
+        setCardStatus(card, 'fail',
+          '⚠ No response from the desktop. Make sure the billing app is running on the shop PC.');
+        return resolve(false);
+      }
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}&select=status,result_message`,
+          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+        const rows = await res.json();
+        if (!rows.length) {                          // row gone → processed & cleaned up
+          setCardStatus(card, 'ok', '✓ Processed.');
+          return resolve(true);
+        }
+        const row = rows[0];
+        if (row.status === 'done') {
+          setCardStatus(card, 'ok', '✓ ' + escapeHtml(row.result_message || 'Done.'));
+          deleteOrderRow(id);
+          return resolve(true);
+        }
+        if (row.status === 'failed') {
+          setCardStatus(card, 'fail', '✗ ' + escapeHtml(row.result_message || 'Processing failed.'));
+          // Keep the failed order so the operator can see the error and retry.
+          // (Previously deleted here, which made failures vanish without a trace.)
+          loadPending();
+          return resolve(false);
+        }
+        setCardStatus(card, 'wait',
+          row.status === 'processing' ? '⚙ Processing on desktop…' : '⏳ Waiting for desktop…');
+        setTimeout(poll, PROCESS_POLL_MS);
+      } catch (e) {
+        setTimeout(poll, PROCESS_POLL_MS);           // transient network blip — retry
+      }
+    };
+
+    if (skipRequest) {
+      // Already flagged — just start watching immediately
+      setCardStatus(card, 'wait', '⚙ Resuming watch — processing on desktop…');
+      setTimeout(poll, PROCESS_POLL_MS);
+    } else {
+      setCardStatus(card, 'wait', '⏳ Sent to desktop — waiting…');
+      fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'process_requested', result_message: '' }),
+      }).then((r) => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        setTimeout(poll, PROCESS_POLL_MS);
+      }).catch((e) => {
+        setCardStatus(card, 'fail', '✗ Could not reach the server: ' + escapeHtml(e.message));
+        resolve(false);
+      });
+    }
+  });
+}
+
+async function processOrder(id, btn) {
+  if (!confirm('Process this order now on the shop computer?')) return;
+  const card = btn.closest('.pending-card');
+  // Pause the list auto-refresh so it doesn't wipe this card mid-processing
+  clearInterval(_pendingPollTimer); _pendingPollTimer = null;
+  await awaitProcess(id, card);
+  setTimeout(resumePending, 2500);
+}
+
+// Retry a previously-failed order. awaitProcess re-flags it process_requested,
+// so the desktop picks it up again; the old failure message is cleared on success.
+async function retryOrder(id, btn) {
+  if (!confirm('Retry processing this order on the shop computer?')) return;
+  const card = btn.closest('.pending-card');
+  clearInterval(_pendingPollTimer); _pendingPollTimer = null;
+  await awaitProcess(id, card);
+  setTimeout(resumePending, 2500);
+}
+
+// ── Bulk processing: process every ticked order, one by one ──
+const _selectedIds = new Set();
+
+function toggleSelect(id, cb) {
+  if (cb.checked) _selectedIds.add(String(id));
+  else _selectedIds.delete(String(id));
+  updateBulkBar();
+}
+
+function clearSelection() {
+  _selectedIds.clear();
+  document.querySelectorAll('.sel-box').forEach(cb => { cb.checked = false; });
+  updateBulkBar();
+}
+
+// Selected ids that are actually visible in the current Local/Market-Yard tab
+function selectedInView() {
+  const visible = new Set(
+    _allPendingOrders
+      .filter(o => (o.order_type || 'local') === _activeType)
+      .map(o => String(o.id)));
+  return [..._selectedIds].filter(id => visible.has(id));
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  if (!bar) return;
+  const ids = selectedInView();
+  if (ids.length) {
+    bar.style.display = '';
+    document.getElementById('bulk-info').textContent = `${ids.length} selected`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+async function processSelected() {
+  const ids = selectedInView();
+  if (!ids.length) return;
+  if (!confirm(`Process ${ids.length} selected order(s) one by one on the shop computer?`)) return;
+
+  clearInterval(_pendingPollTimer); _pendingPollTimer = null;
+  const info    = document.getElementById('bulk-info');
+  const procBtn = document.getElementById('bulk-process');
+  _bulkStop = false;
+  procBtn.textContent = '■ Stop';
+  procBtn.onclick = stopBulk;          // the button becomes "Stop" during the run
+
+  let ok = 0, done = 0;
+  for (let i = 0; i < ids.length; i++) {
+    if (_bulkStop) break;
+    const id = ids[i];
+    _bulkCurrentId = id;
+    info.textContent = `Processing ${i + 1} of ${ids.length}…`;
+    const card = document.querySelector(`.pending-card[data-id="${id}"]`);
+    if (card) card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const success = await awaitProcess(id, card);   // wait for THIS one before the next
+    if (success) ok++;
+    done++;
+    _selectedIds.delete(String(id));
+    if (_bulkStop) break;
+  }
+  _bulkCurrentId = null;
+
+  info.textContent = _bulkStop
+    ? `Stopped after ${done}/${ids.length} (${ok} done)`
+    : `Done: ${ok}/${ids.length} processed`;
+  procBtn.textContent = '⚡ Process selected';
+  procBtn.onclick = processSelected;
+  procBtn.disabled = false;
+  setTimeout(() => { document.getElementById('bulk-bar').style.display = 'none'; resumePending(); }, 3000);
+}
+
+function setCardStatus(card, kind, msg) {
+  if (!card) return;
+  const body = card.querySelector('.pending-body') || card;
+  const btn = card.querySelector('.proc-btn');
+  if (btn) btn.disabled = true;
+  let el = body.querySelector('.proc-status');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'proc-status';
+    body.appendChild(el);
+  }
+  el.className = 'proc-status proc-' + kind;
+  el.innerHTML = msg;
+
+  // Show a Stop button only while the order is waiting/processing
+  let stop = body.querySelector('.stop-btn');
+  if (kind === 'wait') {
+    if (!stop) {
+      stop = document.createElement('button');
+      stop.className = 'stop-btn';
+      stop.textContent = '■ Stop';
+      const id = card.dataset.id;
+      stop.onclick = () => stopProcessing(id, stop);
+      body.appendChild(stop);
+    }
+  } else if (stop) {
+    stop.remove();
+  }
+}
+
+// Attempt to stop an order. Only possible while it is still queued
+// (status 'process_requested'); once the desktop has claimed it, it's too late.
+async function stopProcessing(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Stopping…'; }
+  let reverted = false;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}&status=eq.process_requested`, {
+        method: 'PATCH',
+        headers: {
+          apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json', Prefer: 'return=representation',
+        },
+        body: JSON.stringify({ status: 'pending', result_message: '' }),
+      });
+    const rows = await res.json();
+    reverted = !!(rows && rows.length);
+  } catch (e) { /* network blip — treat as not reverted */ }
+
+  if (reverted) {
+    _cancelled.add(String(id));   // awaitProcess's poll will bail with "Stopped"
+  } else {
+    // Desktop already started billing this one — can't safely interrupt it
+    const card = document.querySelector(`.pending-card[data-id="${id}"]`);
+    setCardStatus(card, 'wait', '⚙ Already processing on the shop computer — can’t stop now.');
+    if (btn) { btn.disabled = false; btn.textContent = '■ Stop'; }
+  }
+}
+
+function stopBulk() {
+  _bulkStop = true;
+  if (_bulkCurrentId) stopProcessing(_bulkCurrentId, null);
+}
+
+function deleteOrderRow(id) {
+  fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+  }).catch(() => {});
+}
+
+function resumePending() {
+  if (!_pendingPollTimer) _pendingPollTimer = setInterval(loadPending, 30000);
+  loadPending();
+}
+
+// ── Past Orders (executed) ────────────────────────────────
+const EXEC_TABLE = "executed_orders";
+let _executedOrders = [];
+
+async function loadExecuted() {
+  const el = document.getElementById('executed-list');
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${EXEC_TABLE}?select=*&order=executed_at.desc&limit=100`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    _executedOrders = await res.json();
+    renderExecuted();
+  } catch (e) {
+    el.innerHTML = `<div class="pending-empty">⚠ ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderExecuted() {
+  const el = document.getElementById('executed-list');
+  if (!_executedOrders.length) {
+    el.innerHTML = '<div class="pending-empty">No past orders yet</div>';
+    return;
+  }
+  el.innerHTML = _executedOrders.map(o => {
+    const itemLines = (o.items || []).map(it => {
+      const freeTxt = (it.free && String(it.free) !== '0')
+        ? ` <span style="color:var(--success)">(+${escapeHtml(String(it.free))} free)</span>` : '';
+      const unitTxt = it.unit ? ' ' + escapeHtml(it.unit) : '';
+      return `${escapeHtml(it.name)} × ${escapeHtml(String(it.qty))}${unitTxt}${freeTxt}`;
+    }).join('<br>');
+    const swBadge = `<span class="badge badge-${o.software}">${(o.software || '').toUpperCase()}</span>`;
+    const typeBadge = o.order_type === 'market_yard'
+      ? `<span class="badge badge-market">Market Yard</span>`
+      : `<span class="badge badge-local">Local</span>`;
+    const when = o.executed_at
+      ? new Date(o.executed_at).toLocaleString([], {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    const ov = orderValue(o.items);
+    const valueHtml = ov.total > 0
+      ? `<span class="pending-value">₹${ov.total.toLocaleString('en-IN', {maximumFractionDigits: 2})}`
+        + `${ov.missing ? ' <span class="partial">(partial)</span>' : ''}</span>`
+      : '';
+    return `<div class="pending-card">
+      <div class="pending-body">
+        <p class="pending-party"><span>${escapeHtml(o.party_name)}</span>${valueHtml}</p>
+        <p class="pending-items">${itemLines}</p>
+        <div class="pending-meta">${swBadge} ${typeBadge} <span>${when}</span></div>
+        <button class="mini-btn" onclick="restoreExecuted('${o.id}', this)">↩ Restore to Pending</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function restoreExecuted(id, btn) {
+  const o = _executedOrders.find(x => String(x.id) === String(id));
+  if (!o) return;
+  if (!confirm(`Add "${o.party_name}" back to pending orders?`)) return;
+  btn.disabled = true;
+  btn.textContent = 'Restoring…';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json', 'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        party_name: o.party_name, items: o.items, software: o.software,
+        order_type: o.order_type || 'local', notes: o.notes || '',
+        print_copies: o.print_copies || 1, source: 'restored', status: 'pending',
+      }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    toast('Restored to pending ✓');
+    btn.textContent = '✓ Restored';
+  } catch (e) {
+    toast('Restore failed: ' + e.message, false);
+    btn.disabled = false;
+    btn.textContent = '↩ Restore to Pending';
+  }
+}
+
+// ── Print the pending order list ──
+// Sends a signal to the desktop app, which opens its own print dialog on A5 paper.
+async function printList() {
+  const signalName = _activeType === 'market_yard' ? 'print_market_yard' : 'print_local';
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/app_heartbeat?on_conflict=name`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({ name: signalName, last_seen: new Date().toISOString() }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    toast('🖨 Print request sent to shop computer ✓');
+  } catch (e) {
+    toast('Could not send print request: ' + e.message, false);
+  }
+}
+</script>
+</body>
+</html>
