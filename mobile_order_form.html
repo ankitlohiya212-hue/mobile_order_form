@@ -659,6 +659,7 @@ function addItem(focusIt) {
   // Update running total whenever qty or rate changes
   row.querySelector(".i-qty").addEventListener("input", updateTotal);
   rateEl.addEventListener("input", updateTotal);
+  row.querySelector(".i-disc")?.addEventListener("input", updateTotal);
   // blur: secondary trigger if user types name manually
   nameEl.addEventListener("blur", () => setTimeout(() => applyLastPrice(nameEl, rateEl, unitEl), 120));
   if (focusIt) nameEl.focus();
@@ -708,7 +709,8 @@ function updateTotal() {
     named++;
     const qty  = parseFloat(r.querySelector(".i-qty").value)  || 0;
     const rate = parseFloat(r.querySelector(".i-rate").value) || 0;
-    if (rate > 0) total += qty * rate;
+    const disc = parseFloat(r.querySelector(".i-disc")?.value) || 0;
+    if (rate > 0) total += qty * rate * (1 - disc / 100);
     else missing++;
   });
 
@@ -844,7 +846,7 @@ async function _doSubmit() {
       toast("Order sent ✓");
       document.getElementById("party").value = "";
       document.getElementById("notes").value = "";
-      document.getElementById("print_copies").value = "1";
+      applyOrderTypeUI();
       document.getElementById("items").innerHTML = "";
       addItem(true);
       updateTotal();
@@ -1074,7 +1076,7 @@ function cancelEdit() {
   document.getElementById('submit').textContent = 'Submit Order';
   document.getElementById('party').value = '';
   document.getElementById('notes').value = '';
-  document.getElementById('print_copies').value = '1';
+  applyOrderTypeUI();
   document.getElementById('items').innerHTML = '';
   addItem(false);
   updateTotal();
