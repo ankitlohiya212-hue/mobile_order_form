@@ -690,11 +690,10 @@ function applySoftwareUI() {
   applyOrderTypeUI();   // keep print copies in sync when software changes
 }
 
-// Auto-set print copies to 2 when Market Yard + Vyapar are both selected.
+// Vyapar default is 2 prints; Tally always 1.
 function applyOrderTypeUI() {
-  const isMY      = document.getElementById("order_type").value === "market_yard";
   const isVyapar  = currentSoftware() === "vyapar";
-  document.getElementById("print_copies").value = (isVyapar && isMY) ? "2" : "1";
+  document.getElementById("print_copies").value = isVyapar ? "2" : "1";
 }
 
 // Live bill total — sum of qty × rate across all item rows
